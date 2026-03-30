@@ -2,7 +2,7 @@
 
 import { validateCronExpression } from "../cron/cron.service";
 import type { Task, CreateTaskInput, UpdateTaskInput } from "./task.types";
-import { TASK_NAME_REGEX } from "./task.types";
+import { TASK_NAME_REGEX, TASK_STATUS } from "./task.types";
 import { TaskRepository } from "./task.repository";
 import {
 	TaskNotFoundError,
@@ -10,6 +10,8 @@ import {
 	InvalidTaskNameError,
 	EmptyCommandError,
 	NoChangesSpecifiedError,
+	TaskAlreadyPausedError,
+	TaskAlreadyActiveError,
 } from "./task.errors";
 
 export class TaskService {
@@ -143,5 +145,53 @@ export class TaskService {
 
 		manifest.tasks.splice(index, 1);
 		await this.repo.save(manifest);
+	}
+
+	/**
+	 * Pause an active task by setting its status to "paused".
+	 * @param name The task name to pause
+	 * @returns The updated task
+	 * @throws TaskNotFoundError if no task with this name exists
+	 * @throws TaskAlreadyPausedError if the task is already paused
+	 */
+	// @spec FR-056: Pause method with validation — .specs/features/009-task-pause-resume/spec.md#fr-056
+	async pause(name: string): Promise<Task> {
+		const manifest = await this.repo.load();
+		const task = manifest.tasks.find((t) => t.name === name);
+		if (!task) {
+			throw new TaskNotFoundError(name);
+		}
+		if (task.status === TASK_STATUS.PAUSED) {
+			throw new TaskAlreadyPausedError(name);
+		}
+
+		task.status = TASK_STATUS.PAUSED;
+		task.updatedAt = new Date().toISOString();
+		await this.repo.save(manifest);
+		return task;
+	}
+
+	/**
+	 * Resume a paused task by setting its status to "active".
+	 * @param name The task name to resume
+	 * @returns The updated task
+	 * @throws TaskNotFoundError if no task with this name exists
+	 * @throws TaskAlreadyActiveError if the task is already active
+	 */
+	// @spec FR-057: Resume method with validation — .specs/features/009-task-pause-resume/spec.md#fr-057
+	async resume(name: string): Promise<Task> {
+		const manifest = await this.repo.load();
+		const task = manifest.tasks.find((t) => t.name === name);
+		if (!task) {
+			throw new TaskNotFoundError(name);
+		}
+		if (task.status === TASK_STATUS.ACTIVE) {
+			throw new TaskAlreadyActiveError(name);
+		}
+
+		task.status = TASK_STATUS.ACTIVE;
+		task.updatedAt = new Date().toISOString();
+		await this.repo.save(manifest);
+		return task;
 	}
 }

@@ -456,3 +456,173 @@ describe("cronshed history", () => {
 		expect(outputLines.length).toBe(3); // header + 2 valid entries
 	});
 });
+
+// --- Task Pause/Resume (Feature 009) ---
+
+// @spec FR-058: Pause/resume CLI handlers — .specs/features/009-task-pause-resume/spec.md#fr-058
+describe("cronshed pause", () => {
+	test("AC-001: pauses an active task", async () => {
+		await run("add", "daily-backup", "--schedule", "0 2 * * *", "--command", "echo backup", "--no-sync");
+		const { stdout, exitCode } = await run("pause", "daily-backup", "--no-sync");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("Task daily-backup paused");
+	});
+
+	test("AC-001: paused task persists in manifest", async () => {
+		await run("add", "daily-backup", "--schedule", "0 2 * * *", "--command", "echo backup", "--no-sync");
+		await run("pause", "daily-backup", "--no-sync");
+		const { stdout } = await run("get", "daily-backup", "--json");
+		const task = JSON.parse(stdout);
+		expect(task.status).toBe("paused");
+	});
+
+	test("AC-013: pause sets updatedAt", async () => {
+		await run("add", "daily-backup", "--schedule", "0 2 * * *", "--command", "echo backup", "--no-sync");
+		await run("pause", "daily-backup", "--no-sync");
+		const { stdout } = await run("get", "daily-backup", "--json");
+		const task = JSON.parse(stdout);
+		expect(task.updatedAt).toBeDefined();
+	});
+
+	test("AC-007: pausing non-existent task gives exit code 1", async () => {
+		const { stderr, exitCode } = await run("pause", "ghost");
+		expect(exitCode).toBe(1);
+		expect(stderr).toContain('Task "ghost" not found');
+	});
+
+	test("AC-005: pausing already-paused task gives exit code 1", async () => {
+		await run("add", "daily-backup", "--schedule", "0 2 * * *", "--command", "echo backup", "--no-sync");
+		await run("pause", "daily-backup", "--no-sync");
+		const { stderr, exitCode } = await run("pause", "daily-backup", "--no-sync");
+		expect(exitCode).toBe(1);
+		expect(stderr).toContain('Task "daily-backup" is already paused');
+	});
+
+	test("AC-012: pause with --no-sync does not show sync message", async () => {
+		await run("add", "daily-backup", "--schedule", "0 2 * * *", "--command", "echo backup", "--no-sync");
+		const { stdout } = await run("pause", "daily-backup", "--no-sync");
+		expect(stdout).not.toContain("Synced to crontab");
+	});
+
+	test("missing task name gives exit code 2", async () => {
+		const { stderr, exitCode } = await run("pause");
+		expect(exitCode).toBe(2);
+		expect(stderr).toContain("Missing task name");
+	});
+});
+
+// @spec FR-058: Resume CLI handler — .specs/features/009-task-pause-resume/spec.md#fr-058
+describe("cronshed resume", () => {
+	test("AC-003: resumes a paused task", async () => {
+		await run("add", "daily-backup", "--schedule", "0 2 * * *", "--command", "echo backup", "--no-sync");
+		await run("pause", "daily-backup", "--no-sync");
+		const { stdout, exitCode } = await run("resume", "daily-backup", "--no-sync");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("Task daily-backup resumed");
+	});
+
+	test("AC-003: resumed task has active status in manifest", async () => {
+		await run("add", "daily-backup", "--schedule", "0 2 * * *", "--command", "echo backup", "--no-sync");
+		await run("pause", "daily-backup", "--no-sync");
+		await run("resume", "daily-backup", "--no-sync");
+		const { stdout } = await run("get", "daily-backup", "--json");
+		const task = JSON.parse(stdout);
+		expect(task.status).toBe("active");
+	});
+
+	test("AC-013: resume sets updatedAt", async () => {
+		await run("add", "daily-backup", "--schedule", "0 2 * * *", "--command", "echo backup", "--no-sync");
+		await run("pause", "daily-backup", "--no-sync");
+		await run("resume", "daily-backup", "--no-sync");
+		const { stdout } = await run("get", "daily-backup", "--json");
+		const task = JSON.parse(stdout);
+		expect(task.updatedAt).toBeDefined();
+	});
+
+	test("AC-007: resuming non-existent task gives exit code 1", async () => {
+		const { stderr, exitCode } = await run("resume", "ghost");
+		expect(exitCode).toBe(1);
+		expect(stderr).toContain('Task "ghost" not found');
+	});
+
+	test("AC-006: resuming already-active task gives exit code 1", async () => {
+		await run("add", "daily-backup", "--schedule", "0 2 * * *", "--command", "echo backup", "--no-sync");
+		const { stderr, exitCode } = await run("resume", "daily-backup", "--no-sync");
+		expect(exitCode).toBe(1);
+		expect(stderr).toContain('Task "daily-backup" is already active');
+	});
+
+	test("AC-012: resume with --no-sync does not show sync message", async () => {
+		await run("add", "daily-backup", "--schedule", "0 2 * * *", "--command", "echo backup", "--no-sync");
+		await run("pause", "daily-backup", "--no-sync");
+		const { stdout } = await run("resume", "daily-backup", "--no-sync");
+		expect(stdout).not.toContain("Synced to crontab");
+	});
+
+	test("missing task name gives exit code 2", async () => {
+		const { stderr, exitCode } = await run("resume");
+		expect(exitCode).toBe(2);
+		expect(stderr).toContain("Missing task name");
+	});
+});
+
+// @spec FR-060: List and get show paused status — .specs/features/009-task-pause-resume/spec.md#fr-060
+describe("cronshed list/get with paused tasks", () => {
+	test("AC-008: list shows paused status for paused tasks", async () => {
+		await run("add", "active-task", "--schedule", "0 2 * * *", "--command", "echo active", "--no-sync");
+		await run("add", "paused-task", "--schedule", "0 9 * * 1", "--command", "echo paused", "--no-sync");
+		await run("pause", "paused-task", "--no-sync");
+
+		const { stdout, exitCode } = await run("list");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("active-task");
+		expect(stdout).toContain("paused-task");
+		expect(stdout).toContain("active");
+		expect(stdout).toContain("paused");
+	});
+
+	test("AC-008: paused task shows dash for next run in list", async () => {
+		await run("add", "paused-task", "--schedule", "0 9 * * 1", "--command", "echo paused", "--no-sync");
+		await run("pause", "paused-task", "--no-sync");
+
+		const { stdout } = await run("list");
+		expect(stdout).toContain("\u2014");
+	});
+
+	test("AC-009: list --json includes paused task with correct status", async () => {
+		await run("add", "paused-task", "--schedule", "0 9 * * 1", "--command", "echo paused", "--no-sync");
+		await run("pause", "paused-task", "--no-sync");
+
+		const { stdout, exitCode } = await run("list", "--json");
+		expect(exitCode).toBe(0);
+		const parsed = JSON.parse(stdout);
+		expect(parsed[0].status).toBe("paused");
+		expect(parsed[0].nextRun).toBe("\u2014");
+	});
+
+	test("AC-008: get shows paused status and dash for next run", async () => {
+		await run("add", "paused-task", "--schedule", "0 9 * * 1", "--command", "echo paused", "--no-sync");
+		await run("pause", "paused-task", "--no-sync");
+
+		const { stdout, exitCode } = await run("get", "paused-task");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("paused");
+	});
+
+	test("AC-009: get --json on paused task has correct fields", async () => {
+		await run("add", "paused-task", "--schedule", "0 9 * * 1", "--command", "echo paused", "--no-sync");
+		await run("pause", "paused-task", "--no-sync");
+
+		const { stdout, exitCode } = await run("get", "paused-task", "--json");
+		expect(exitCode).toBe(0);
+		const task = JSON.parse(stdout);
+		expect(task.status).toBe("paused");
+		expect(task.nextRun).toBe("\u2014");
+	});
+
+	test("pause and resume commands appear in help", async () => {
+		const { stdout } = await run("--help");
+		expect(stdout).toContain("pause");
+		expect(stdout).toContain("resume");
+	});
+});

@@ -1,12 +1,13 @@
 // @spec FR-002: Task entity definition — .specs/features/001-task-manifest/spec.md#fr-002
 
 // @spec FR-047: Task entity with notify field — .specs/features/008-failure-notifications/spec.md#fr-047
+// @spec FR-055: Status expanded to active|paused — .specs/features/009-task-pause-resume/spec.md#fr-055
 export interface Task {
 	id: string;
 	name: string;
 	schedule: string;
 	command: string;
-	status: "active";
+	status: TaskStatus;
 	notify: boolean;
 	createdAt: string;
 	updatedAt?: string;
@@ -30,8 +31,10 @@ export interface UpdateTaskInput {
 	notify?: boolean;
 }
 
+// @spec FR-055: TASK_STATUS includes paused — .specs/features/009-task-pause-resume/spec.md#fr-055
 export const TASK_STATUS = {
 	ACTIVE: "active",
+	PAUSED: "paused",
 } as const;
 
 export type TaskStatus = (typeof TASK_STATUS)[keyof typeof TASK_STATUS];

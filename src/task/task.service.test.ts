@@ -6,6 +6,8 @@ import {
 	DuplicateTaskNameError,
 	InvalidTaskNameError,
 	EmptyCommandError,
+	TaskAlreadyPausedError,
+	TaskAlreadyActiveError,
 } from "./task.errors";
 import { InvalidCronExpressionError } from "../cron/cron.errors";
 import { join } from "node:path";
@@ -195,5 +197,90 @@ describe("TaskService.remove", () => {
 		await service.remove("only-task");
 		const tasks = await service.list();
 		expect(tasks).toEqual([]);
+	});
+});
+
+// @spec FR-056: Pause method — .specs/features/009-task-pause-resume/spec.md#fr-056
+describe("TaskService.pause", () => {
+	test("AC-001: pauses an active task and sets status to paused", async () => {
+		await service.add({ name: "daily-backup", schedule: "0 2 * * *", command: "echo backup" });
+		const paused = await service.pause("daily-backup");
+		expect(paused.status).toBe("paused");
+		expect(paused.name).toBe("daily-backup");
+	});
+
+	test("AC-013: pause sets updatedAt", async () => {
+		await service.add({ name: "daily-backup", schedule: "0 2 * * *", command: "echo backup" });
+		const paused = await service.pause("daily-backup");
+		expect(paused.updatedAt).toBeDefined();
+	});
+
+	test("AC-001: paused status is persisted to manifest", async () => {
+		await service.add({ name: "daily-backup", schedule: "0 2 * * *", command: "echo backup" });
+		await service.pause("daily-backup");
+		const task = await service.get("daily-backup");
+		expect(task.status).toBe("paused");
+	});
+
+	test("AC-007: throws TaskNotFoundError for non-existent task", async () => {
+		expect(service.pause("ghost")).rejects.toThrow(TaskNotFoundError);
+	});
+
+	test("AC-005: throws TaskAlreadyPausedError for already-paused task", async () => {
+		await service.add({ name: "daily-backup", schedule: "0 2 * * *", command: "echo backup" });
+		await service.pause("daily-backup");
+		expect(service.pause("daily-backup")).rejects.toThrow(TaskAlreadyPausedError);
+	});
+
+	test("paused task preserves other fields", async () => {
+		await service.add({ name: "daily-backup", schedule: "0 2 * * *", command: "echo backup", notify: true });
+		const paused = await service.pause("daily-backup");
+		expect(paused.schedule).toBe("0 2 * * *");
+		expect(paused.command).toBe("echo backup");
+		expect(paused.notify).toBe(true);
+	});
+});
+
+// @spec FR-057: Resume method — .specs/features/009-task-pause-resume/spec.md#fr-057
+describe("TaskService.resume", () => {
+	test("AC-003: resumes a paused task and sets status to active", async () => {
+		await service.add({ name: "daily-backup", schedule: "0 2 * * *", command: "echo backup" });
+		await service.pause("daily-backup");
+		const resumed = await service.resume("daily-backup");
+		expect(resumed.status).toBe("active");
+		expect(resumed.name).toBe("daily-backup");
+	});
+
+	test("AC-013: resume sets updatedAt", async () => {
+		await service.add({ name: "daily-backup", schedule: "0 2 * * *", command: "echo backup" });
+		await service.pause("daily-backup");
+		const resumed = await service.resume("daily-backup");
+		expect(resumed.updatedAt).toBeDefined();
+	});
+
+	test("AC-003: resumed status is persisted to manifest", async () => {
+		await service.add({ name: "daily-backup", schedule: "0 2 * * *", command: "echo backup" });
+		await service.pause("daily-backup");
+		await service.resume("daily-backup");
+		const task = await service.get("daily-backup");
+		expect(task.status).toBe("active");
+	});
+
+	test("AC-007: throws TaskNotFoundError for non-existent task", async () => {
+		expect(service.resume("ghost")).rejects.toThrow(TaskNotFoundError);
+	});
+
+	test("AC-006: throws TaskAlreadyActiveError for already-active task", async () => {
+		await service.add({ name: "daily-backup", schedule: "0 2 * * *", command: "echo backup" });
+		expect(service.resume("daily-backup")).rejects.toThrow(TaskAlreadyActiveError);
+	});
+
+	test("resumed task preserves other fields", async () => {
+		await service.add({ name: "daily-backup", schedule: "0 2 * * *", command: "echo backup", notify: true });
+		await service.pause("daily-backup");
+		const resumed = await service.resume("daily-backup");
+		expect(resumed.schedule).toBe("0 2 * * *");
+		expect(resumed.command).toBe("echo backup");
+		expect(resumed.notify).toBe(true);
 	});
 });

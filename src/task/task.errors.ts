@@ -51,6 +51,22 @@ export class NoChangesSpecifiedError extends Error {
 	}
 }
 
+// @spec FR-061: TaskAlreadyPausedError — .specs/features/009-task-pause-resume/spec.md#fr-061
+export class TaskAlreadyPausedError extends Error {
+	constructor(name: string) {
+		super(`Task "${name}" is already paused`);
+		this.name = "TaskAlreadyPausedError";
+	}
+}
+
+// @spec FR-061: TaskAlreadyActiveError — .specs/features/009-task-pause-resume/spec.md#fr-061
+export class TaskAlreadyActiveError extends Error {
+	constructor(name: string) {
+		super(`Task "${name}" is already active`);
+		this.name = "TaskAlreadyActiveError";
+	}
+}
+
 export class ManifestAccessError extends Error {
 	constructor(path: string, cause?: Error) {
 		super(`Cannot access ${path}`);

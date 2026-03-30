@@ -16,6 +16,8 @@ import {
 	ManifestCorruptedError,
 	ManifestVersionError,
 	ManifestAccessError,
+	TaskAlreadyPausedError,
+	TaskAlreadyActiveError,
 } from "../task/task.errors";
 import { resolveCommand } from "./command.resolver";
 import {
@@ -29,6 +31,7 @@ import { getDataDir } from "../app/config";
 import { getNextExecution } from "../cron/cron.service";
 import { getLastExecution } from "../log/log.service";
 import type { Task, EnrichedTask } from "../task/task.types";
+import { TASK_STATUS } from "../task/task.types";
 import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff } from "./cli.formatter";
 import { getExecutionHistory } from "../log/log.service";
 
@@ -97,7 +100,10 @@ function getExitCode(err: unknown): number {
 	) {
 		return 3;
 	}
-	if (err instanceof TaskNotFoundError || err instanceof DuplicateTaskNameError) {
+	if (
+		err instanceof TaskNotFoundError || err instanceof DuplicateTaskNameError ||
+		err instanceof TaskAlreadyPausedError || err instanceof TaskAlreadyActiveError
+	) {
 		return 1;
 	}
 	if (err instanceof NoChangesSpecifiedError) {
@@ -330,20 +336,72 @@ async function handleRemove(args: string[], service: TaskService, repo: TaskRepo
 	}
 }
 
+// @spec FR-058: Pause handler with --no-sync and auto-sync — .specs/features/009-task-pause-resume/spec.md#fr-058
+async function handlePause(args: string[], service: TaskService, repo: TaskRepository): Promise<void> {
+	const name = args[0];
+	if (!name) {
+		console.error(formatError("Missing task name", "Usage: cronshed pause <name> [--no-sync]"));
+		process.exit(2);
+	}
+
+	const { values } = parseArgs({
+		args: args.slice(1),
+		options: {
+			"no-sync": { type: "boolean", default: false },
+		},
+		allowPositionals: false,
+	});
+
+	await service.pause(name);
+	console.log(formatSuccess(`Task ${name} paused`));
+
+	if (!values["no-sync"]) {
+		await autoSync(repo);
+	}
+}
+
+// @spec FR-058: Resume handler with --no-sync and auto-sync — .specs/features/009-task-pause-resume/spec.md#fr-058
+async function handleResume(args: string[], service: TaskService, repo: TaskRepository): Promise<void> {
+	const name = args[0];
+	if (!name) {
+		console.error(formatError("Missing task name", "Usage: cronshed resume <name> [--no-sync]"));
+		process.exit(2);
+	}
+
+	const { values } = parseArgs({
+		args: args.slice(1),
+		options: {
+			"no-sync": { type: "boolean", default: false },
+		},
+		allowPositionals: false,
+	});
+
+	await service.resume(name);
+	console.log(formatSuccess(`Task ${name} resumed`));
+
+	if (!values["no-sync"]) {
+		await autoSync(repo);
+	}
+}
+
 /**
  * Enrich a single task with last execution and next run data.
+ * Paused tasks show "--" for nextRun since they will not execute.
  * @param task The raw task from the manifest
  * @returns Enriched task with lastRun, lastExitCode, nextRun
  */
+// @spec FR-060: Paused tasks show "--" for nextRun — .specs/features/009-task-pause-resume/spec.md#fr-060
 async function enrichTask(task: Task): Promise<EnrichedTask> {
 	const lastExec = await getLastExecution(task.name);
-	const nextRun = getNextExecution(task.schedule);
+	const nextRun = task.status === TASK_STATUS.PAUSED
+		? "\u2014"
+		: getNextExecution(task.schedule).toISOString();
 
 	return {
 		...task,
 		lastRun: lastExec?.timestamp ?? null,
 		lastExitCode: lastExec?.exitCode ?? null,
-		nextRun: nextRun.toISOString(),
+		nextRun,
 	};
 }
 
@@ -424,6 +482,8 @@ const MUTATION_SUBCOMMANDS: Record<string, (args: string[], service: TaskService
 	add: handleAdd,
 	update: handleUpdate,
 	remove: handleRemove,
+	pause: handlePause,
+	resume: handleResume,
 };
 
 /** Commands that manage their own dependencies (no shared TaskService). */
@@ -449,6 +509,8 @@ export async function runCli(argv: string[]): Promise<void> {
 		console.log("  get <name> [--json]                                            Show task details");
 		console.log("  update <name> [--schedule '<cron>'] [--command '<cmd>'] [--notify|--no-notify] [--no-sync]  Update a task");
 		console.log("  remove <name> [--no-sync]                                     Remove a task");
+		console.log("  pause <name> [--no-sync]                                      Pause a task (remove from crontab)");
+		console.log("  resume <name> [--no-sync]                                     Resume a paused task");
 		console.log("  history <name> [--limit N] [--json]                            Show execution history");
 		console.log("  sync [--dry-run] [--clear]                                    Sync tasks to crontab");
 		return;
