@@ -5,7 +5,11 @@ export interface WrapperConfig {
 	command: string;
 	logPath: string;
 	maxOutputBytes: number;
+	notify: boolean;
 }
+
+/** Maximum stderr characters included in notification message. */
+export const NOTIFY_STDERR_MAX_CHARS = 500;
 
 /** Maximum output bytes per field (stdout/stderr) before truncation. */
 export const MAX_OUTPUT_BYTES = 10240;

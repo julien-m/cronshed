@@ -48,6 +48,7 @@ describe("TaskRepository.load", () => {
 					schedule: "0 0 * * *",
 					command: "echo hi",
 					status: "active",
+					notify: false,
 					createdAt: "2026-03-30T00:00:00Z",
 				},
 			],
@@ -56,6 +57,25 @@ describe("TaskRepository.load", () => {
 		const manifest = await repo.load();
 		expect(manifest.tasks).toHaveLength(1);
 		expect(manifest.tasks[0]!.name).toBe("test-task");
+	});
+
+	test("backward compat: loads task without notify field and defaults to false", async () => {
+		const data = {
+			version: 1,
+			tasks: [
+				{
+					id: "old-id",
+					name: "old-task",
+					schedule: "0 0 * * *",
+					command: "echo old",
+					status: "active",
+					createdAt: "2026-03-30T00:00:00Z",
+				},
+			],
+		};
+		await Bun.write(tasksPath, JSON.stringify(data));
+		const manifest = await repo.load();
+		expect(manifest.tasks[0]!.notify).toBe(false);
 	});
 });
 
@@ -80,6 +100,7 @@ describe("TaskRepository.save", () => {
 					schedule: "0 0 * * *",
 					command: "echo atomic",
 					status: "active",
+					notify: false,
 					createdAt: "2026-03-30T00:00:00Z",
 				},
 			],

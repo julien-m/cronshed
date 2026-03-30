@@ -1,11 +1,13 @@
 // @spec FR-002: Task entity definition — .specs/features/001-task-manifest/spec.md#fr-002
 
+// @spec FR-047: Task entity with notify field — .specs/features/008-failure-notifications/spec.md#fr-047
 export interface Task {
 	id: string;
 	name: string;
 	schedule: string;
 	command: string;
 	status: "active";
+	notify: boolean;
 	createdAt: string;
 	updatedAt?: string;
 }
@@ -19,11 +21,13 @@ export interface CreateTaskInput {
 	name: string;
 	schedule: string;
 	command: string;
+	notify?: boolean;
 }
 
 export interface UpdateTaskInput {
 	schedule?: string;
 	command?: string;
+	notify?: boolean;
 }
 
 export const TASK_STATUS = {

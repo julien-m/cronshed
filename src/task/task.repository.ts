@@ -58,7 +58,14 @@ export class TaskRepository {
 			throw new ManifestVersionError(MANIFEST_VERSION, manifest.version);
 		}
 
-		return parsed as TaskManifest;
+		// Backward compat: tasks created before 008-failure-notifications have no notify field
+		const result = parsed as TaskManifest;
+		for (const task of result.tasks) {
+			if ((task as unknown as Record<string, unknown>).notify === undefined) {
+				task.notify = false;
+			}
+		}
+		return result;
 	}
 
 	/**

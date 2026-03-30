@@ -56,12 +56,14 @@ export function formatTaskTable(tasks: EnrichedTask[]): string {
  * @returns Multi-line formatted task details
  */
 export function formatTaskDetails(task: EnrichedTask): string {
+	// @spec FR-054: Display notify status — .specs/features/008-failure-notifications/spec.md#fr-054
 	const lines = [
 		`Name:       ${task.name}`,
 		`ID:         ${task.id}`,
 		`Schedule:   ${task.schedule}`,
 		`Command:    ${task.command}`,
 		`Status:     ${task.status}`,
+		`Notify:     ${task.notify ? "on" : "off"}`,
 		`Created:    ${task.createdAt}`,
 	];
 	if (task.updatedAt) {

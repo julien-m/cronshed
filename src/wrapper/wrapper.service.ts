@@ -3,7 +3,7 @@
 import { join } from "node:path";
 import { mkdir, chmod, unlink, readdir } from "node:fs/promises";
 import type { WrapperConfig } from "./wrapper.types";
-import { MAX_OUTPUT_BYTES } from "./wrapper.types";
+import { MAX_OUTPUT_BYTES, NOTIFY_STDERR_MAX_CHARS } from "./wrapper.types";
 import { WrapperGenerationError } from "./wrapper.errors";
 
 /**
@@ -59,6 +59,32 @@ const WRAPPER_SCRIPT_BODY = [
 	"",
 ].join("\n");
 
+/**
+ * Notification block inserted into wrapper scripts when notify is enabled.
+ * Uses {{TASK_NAME}} and {{NOTIFY_MAX}} as placeholders.
+ * @spec FR-048: Notification block — .specs/features/008-failure-notifications/spec.md#fr-048
+ * @spec FR-049: Stderr truncation for notification — .specs/features/008-failure-notifications/spec.md#fr-049
+ */
+// prettier-ignore
+const NOTIFY_BLOCK = [
+	"",
+	"# --- Failure notification ---",
+	"# @spec FR-048: Send Telegram alert on failure — .specs/features/008-failure-notifications/spec.md#fr-048",
+	"if [ $_exit_code -ne 0 ]; then",
+	"  if command -v cc-hub >/dev/null 2>&1; then",
+	'    _notify_stderr=$(head -c {{NOTIFY_MAX}} "$_stderr_file")',
+	'    if [ -z "$_notify_stderr" ]; then',
+	'      _notify_stderr="no stderr output"',
+	'    elif [ $(wc -c < "$_stderr_file") -gt {{NOTIFY_MAX}} ]; then',
+	'      _notify_stderr="${_notify_stderr}..."',
+	"    fi",
+	'    cc-hub telegram send "[cronshed] Task \\"{{TASK_NAME}}\\" failed (exit code $_exit_code) at $_timestamp',
+	'Stderr: $_notify_stderr"',
+	"  fi",
+	"fi",
+	"",
+].join("\n");
+
 export class WrapperService {
 	private readonly wrappersDir: string;
 	private readonly logsDir: string;
@@ -71,11 +97,12 @@ export class WrapperService {
 	/**
 	 * Generate a wrapper script for a task.
 	 * Creates the wrappers directory if needed, writes the script, sets 0755 permissions.
-	 * @param task Task with name and command
+	 * @param task Task with name, command, and notify flag
 	 * @returns Absolute path to the generated wrapper script
 	 * @throws WrapperGenerationError if generation fails
 	 */
-	async generate(task: { name: string; command: string }): Promise<string> {
+	// @spec FR-050: Pass notify to buildScript — .specs/features/008-failure-notifications/spec.md#fr-050
+	async generate(task: { name: string; command: string; notify?: boolean }): Promise<string> {
 		const wrapperPath = this.getWrapperPath(task.name);
 		const logPath = join(this.logsDir, `${task.name}.jsonl`);
 
@@ -84,6 +111,7 @@ export class WrapperService {
 			command: task.command,
 			logPath,
 			maxOutputBytes: MAX_OUTPUT_BYTES,
+			notify: task.notify ?? false,
 		};
 
 		try {
@@ -121,10 +149,11 @@ export class WrapperService {
 
 	/**
 	 * Regenerate all wrappers from tasks and remove orphaned wrappers.
-	 * @param tasks Array of tasks with name and command
+	 * @param tasks Array of tasks with name, command, and notify flag
 	 */
 	// @spec FR-044: Sync regenerates wrappers — .specs/features/005-wrapper-script-generation/spec.md#fr-044
-	async syncWrappers(tasks: { name: string; command: string }[]): Promise<void> {
+	// @spec FR-053: Sync passes notify per task — .specs/features/008-failure-notifications/spec.md#fr-053
+	async syncWrappers(tasks: { name: string; command: string; notify?: boolean }[]): Promise<void> {
 		// Generate all wrappers
 		for (const task of tasks) {
 			await this.generate(task);
@@ -162,12 +191,14 @@ export class WrapperService {
 
 	/**
 	 * Build the bash wrapper script content.
+	 * When notify is true, includes a notification block that calls cc-hub on failure.
 	 * @param config Wrapper configuration
 	 * @returns Complete bash script as a string
 	 */
 	// @spec FR-037: Wrapper script content — .specs/features/005-wrapper-script-generation/spec.md#fr-037
+	// @spec FR-048: Notification block — .specs/features/008-failure-notifications/spec.md#fr-048
 	buildScript(config: WrapperConfig): string {
-		const { taskName, command, logPath, maxOutputBytes } = config;
+		const { taskName, command, logPath, maxOutputBytes, notify } = config;
 		const logsDir = this.logsDir;
 		const timestamp = new Date().toISOString();
 
@@ -183,10 +214,22 @@ export class WrapperService {
 		script += 'CRONSHED_LOG_FILE="' + logPath + '"\n';
 		script += "CRONSHED_MAX_OUTPUT=" + maxOutputBytes + "\n\n";
 
-		// The rest of the script is static bash — use a raw string block
-		// to avoid any TypeScript interpolation issues with bash ${} syntax
-		script += WRAPPER_SCRIPT_BODY.replace("{{COMMAND}}", command);
+		// Core wrapper body: execute, capture, log
+		let body = WRAPPER_SCRIPT_BODY.replace("{{COMMAND}}", command);
 
+		// @spec FR-048: Insert notification block before cleanup when notify enabled
+		if (notify) {
+			const notifyBlock = NOTIFY_BLOCK
+				.replace(/\{\{TASK_NAME\}\}/g, taskName)
+				.replace(/\{\{NOTIFY_MAX\}\}/g, String(NOTIFY_STDERR_MAX_CHARS));
+			// Insert notification block before temp file cleanup
+			body = body.replace(
+				'rm -f "$_stdout_file" "$_stderr_file"',
+				notifyBlock + '\nrm -f "$_stdout_file" "$_stderr_file"',
+			);
+		}
+
+		script += body;
 		return script;
 	}
 }

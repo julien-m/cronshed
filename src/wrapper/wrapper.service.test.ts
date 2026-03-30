@@ -25,6 +25,7 @@ describe("WrapperService", () => {
 				command: "/usr/local/bin/backup.sh",
 				logPath: join(dataDir, "logs", "backup-db.jsonl"),
 				maxOutputBytes: MAX_OUTPUT_BYTES,
+				notify: false,
 			});
 
 			expect(script).toStartWith("#!/bin/bash\n");
@@ -39,6 +40,7 @@ describe("WrapperService", () => {
 				command: "echo test",
 				logPath,
 				maxOutputBytes: MAX_OUTPUT_BYTES,
+				notify: false,
 			});
 
 			expect(script).toContain(`CRONSHED_LOG_FILE="${logPath}"`);
@@ -50,6 +52,7 @@ describe("WrapperService", () => {
 				command: "echo test",
 				logPath: "/tmp/test.jsonl",
 				maxOutputBytes: 10240,
+				notify: false,
 			});
 
 			expect(script).toContain("CRONSHED_MAX_OUTPUT=10240");
@@ -64,6 +67,7 @@ describe("WrapperService", () => {
 				command: "echo test",
 				logPath: "/tmp/test.jsonl",
 				maxOutputBytes: 10240,
+				notify: false,
 			});
 
 			expect(script).toContain("_json_escape()");
@@ -77,9 +81,92 @@ describe("WrapperService", () => {
 				command: "echo test",
 				logPath: "/tmp/test.jsonl",
 				maxOutputBytes: 10240,
+				notify: false,
 			});
 
 			expect(script).toContain("exit $_exit_code");
+		});
+
+		// @spec FR-048: Notification block in wrapper — .specs/features/008-failure-notifications/spec.md#fr-048
+		test("AC-063: includes notification block when notify is true", () => {
+			const script = service.buildScript({
+				taskName: "backup-db",
+				command: "echo test",
+				logPath: "/tmp/test.jsonl",
+				maxOutputBytes: MAX_OUTPUT_BYTES,
+				notify: true,
+			});
+
+			expect(script).toContain("# --- Failure notification ---");
+			expect(script).toContain("cc-hub telegram send");
+			expect(script).toContain("backup-db");
+			expect(script).toContain("command -v cc-hub");
+		});
+
+		test("AC-064: does NOT include notification block when notify is false", () => {
+			const script = service.buildScript({
+				taskName: "backup-db",
+				command: "echo test",
+				logPath: "/tmp/test.jsonl",
+				maxOutputBytes: MAX_OUTPUT_BYTES,
+				notify: false,
+			});
+
+			expect(script).not.toContain("# --- Failure notification ---");
+			expect(script).not.toContain("cc-hub telegram send");
+		});
+
+		// @spec FR-049: Stderr truncation for notification — .specs/features/008-failure-notifications/spec.md#fr-049
+		test("AC-070: notification block truncates stderr to 500 chars", () => {
+			const script = service.buildScript({
+				taskName: "test-task",
+				command: "echo test",
+				logPath: "/tmp/test.jsonl",
+				maxOutputBytes: MAX_OUTPUT_BYTES,
+				notify: true,
+			});
+
+			expect(script).toContain("head -c 500");
+		});
+
+		test("AC-071: notification uses 'no stderr output' when stderr is empty", () => {
+			const script = service.buildScript({
+				taskName: "test-task",
+				command: "echo test",
+				logPath: "/tmp/test.jsonl",
+				maxOutputBytes: MAX_OUTPUT_BYTES,
+				notify: true,
+			});
+
+			expect(script).toContain("no stderr output");
+		});
+
+		// @spec FR-048: Notification block checks cc-hub availability — .specs/features/008-failure-notifications/spec.md#fr-048
+		test("AC-065: notification block checks cc-hub availability before sending", () => {
+			const script = service.buildScript({
+				taskName: "test-task",
+				command: "echo test",
+				logPath: "/tmp/test.jsonl",
+				maxOutputBytes: MAX_OUTPUT_BYTES,
+				notify: true,
+			});
+
+			expect(script).toContain("command -v cc-hub >/dev/null 2>&1");
+		});
+
+		test("notification block is inserted before temp file cleanup", () => {
+			const script = service.buildScript({
+				taskName: "test-task",
+				command: "echo test",
+				logPath: "/tmp/test.jsonl",
+				maxOutputBytes: MAX_OUTPUT_BYTES,
+				notify: true,
+			});
+
+			const notifyIdx = script.indexOf("# --- Failure notification ---");
+			const cleanupIdx = script.indexOf('rm -f "$_stdout_file"');
+			expect(notifyIdx).toBeGreaterThan(-1);
+			expect(cleanupIdx).toBeGreaterThan(notifyIdx);
 		});
 	});
 
@@ -114,6 +201,29 @@ describe("WrapperService", () => {
 			const content = await Bun.file(service.getWrapperPath("task-a")).text();
 			expect(content).toContain("echo v2");
 			expect(content).not.toContain("# Command: echo v1");
+		});
+
+		// @spec FR-050: Generate passes notify to buildScript — .specs/features/008-failure-notifications/spec.md#fr-050
+		test("AC-063: generate with notify=true includes notification block", async () => {
+			await service.generate({ name: "notify-task", command: "echo test", notify: true });
+
+			const content = await Bun.file(service.getWrapperPath("notify-task")).text();
+			expect(content).toContain("cc-hub telegram send");
+			expect(content).toContain("notify-task");
+		});
+
+		test("AC-064: generate with notify=false excludes notification block", async () => {
+			await service.generate({ name: "silent-task", command: "echo test", notify: false });
+
+			const content = await Bun.file(service.getWrapperPath("silent-task")).text();
+			expect(content).not.toContain("cc-hub telegram send");
+		});
+
+		test("generate defaults notify to false when not provided", async () => {
+			await service.generate({ name: "default-task", command: "echo test" });
+
+			const content = await Bun.file(service.getWrapperPath("default-task")).text();
+			expect(content).not.toContain("cc-hub telegram send");
 		});
 	});
 
@@ -170,6 +280,20 @@ describe("WrapperService", () => {
 			// Should not throw when wrappers dir doesn't exist
 			await service.syncWrappers([{ name: "task-a", command: "echo a" }]);
 			expect(await Bun.file(service.getWrapperPath("task-a")).exists()).toBe(true);
+		});
+
+		// @spec FR-053: Sync passes notify per task — .specs/features/008-failure-notifications/spec.md#fr-053
+		test("AC-072: sync generates wrappers with correct notify state per task", async () => {
+			await service.syncWrappers([
+				{ name: "notify-task", command: "echo a", notify: true },
+				{ name: "silent-task", command: "echo b", notify: false },
+			]);
+
+			const notifyContent = await Bun.file(service.getWrapperPath("notify-task")).text();
+			const silentContent = await Bun.file(service.getWrapperPath("silent-task")).text();
+
+			expect(notifyContent).toContain("cc-hub telegram send");
+			expect(silentContent).not.toContain("cc-hub telegram send");
 		});
 	});
 

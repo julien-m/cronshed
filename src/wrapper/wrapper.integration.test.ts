@@ -385,4 +385,123 @@ describe("Wrapper Integration", () => {
 			expect(entry.stdout).not.toContain("truncated");
 		});
 	});
+
+	// @spec AC-063, AC-064, AC-065: Failure notification integration tests — .specs/features/008-failure-notifications/spec.md#ac-063
+	describe("Failure notification (Story 1 — 008)", () => {
+		test("AC-063: wrapper calls cc-hub on failure when notify enabled", async () => {
+			// Create a mock cc-hub that records its arguments
+			const mockBinDir = join(dataDir, "mock-bin");
+			await mkdir(mockBinDir, { recursive: true });
+			const mockCallLog = join(dataDir, "cc-hub-calls.log");
+			const mockCcHub = join(mockBinDir, "cc-hub");
+			await Bun.write(mockCcHub, `#!/bin/bash\necho "$@" >> "${mockCallLog}"\n`);
+			const { chmod } = await import("node:fs/promises");
+			await chmod(mockCcHub, 0o755);
+
+			// Create a failing script
+			const failScript = join(dataDir, "fail.sh");
+			await Bun.write(failScript, "#!/bin/bash\necho 'connection refused' >&2\nexit 1\n");
+			await chmod(failScript, 0o755);
+
+			const task = await service.add({
+				name: "notify-fail",
+				schedule: "0 2 * * *",
+				command: failScript,
+				notify: true,
+			});
+			await wrapperService.generate(task);
+
+			const wrapperPath = wrapperService.getWrapperPath("notify-fail");
+			const proc = Bun.spawn(["bash", wrapperPath], {
+				stdout: "pipe",
+				stderr: "pipe",
+				env: { ...process.env, PATH: `${mockBinDir}:${process.env.PATH}` },
+			});
+			await proc.exited;
+
+			// Verify cc-hub was called
+			const calls = await Bun.file(mockCallLog).text();
+			expect(calls).toContain("telegram send");
+			expect(calls).toContain("notify-fail");
+			expect(calls).toContain("exit code");
+		});
+
+		test("AC-064: wrapper does NOT call cc-hub on success when notify enabled", async () => {
+			const mockBinDir = join(dataDir, "mock-bin");
+			await mkdir(mockBinDir, { recursive: true });
+			const mockCallLog = join(dataDir, "cc-hub-calls.log");
+			const mockCcHub = join(mockBinDir, "cc-hub");
+			await Bun.write(mockCcHub, `#!/bin/bash\necho "$@" >> "${mockCallLog}"\n`);
+			const { chmod } = await import("node:fs/promises");
+			await chmod(mockCcHub, 0o755);
+
+			const task = await service.add({
+				name: "notify-success",
+				schedule: "0 2 * * *",
+				command: "echo ok",
+				notify: true,
+			});
+			await wrapperService.generate(task);
+
+			const wrapperPath = wrapperService.getWrapperPath("notify-success");
+			const proc = Bun.spawn(["bash", wrapperPath], {
+				stdout: "pipe",
+				stderr: "pipe",
+				env: { ...process.env, PATH: `${mockBinDir}:${process.env.PATH}` },
+			});
+			await proc.exited;
+
+			// cc-hub should NOT have been called
+			const logExists = await Bun.file(mockCallLog).exists();
+			expect(logExists).toBe(false);
+		});
+
+		test("AC-065: wrapper skips notification when cc-hub not in PATH", async () => {
+			// Create a failing script
+			const failScript = join(dataDir, "fail2.sh");
+			await Bun.write(failScript, "#!/bin/bash\nexit 1\n");
+			const { chmod } = await import("node:fs/promises");
+			await chmod(failScript, 0o755);
+
+			const task = await service.add({
+				name: "notify-no-cchub",
+				schedule: "0 2 * * *",
+				command: failScript,
+				notify: true,
+			});
+			await wrapperService.generate(task);
+
+			const wrapperPath = wrapperService.getWrapperPath("notify-no-cchub");
+			// Use a stripped PATH without cc-hub
+			const proc = Bun.spawn(["bash", wrapperPath], {
+				stdout: "pipe",
+				stderr: "pipe",
+				env: { ...process.env, PATH: "/usr/bin:/bin" },
+			});
+			const exitCode = await proc.exited;
+
+			// Should exit with 1 (the command's exit code), not crash
+			expect(exitCode).toBe(1);
+
+			// Log should still be recorded
+			const logContent = await Bun.file(join(dataDir, "logs", "notify-no-cchub.jsonl")).text();
+			const entry = JSON.parse(logContent.trim());
+			expect(entry.exitCode).toBe(1);
+		});
+
+		test("AC-067: wrapper does NOT include notification block when notify is false", async () => {
+			const task = await service.add({
+				name: "no-notify",
+				schedule: "0 2 * * *",
+				command: "/bin/false",
+				notify: false,
+			});
+			await wrapperService.generate(task);
+
+			const wrapperPath = wrapperService.getWrapperPath("no-notify");
+			const script = await Bun.file(wrapperPath).text();
+			expect(script).not.toContain("cc-hub");
+			expect(script).not.toContain("Failure notification");
+		});
+	});
 });

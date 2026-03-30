@@ -9,6 +9,7 @@ const sampleTask: Task = {
 	schedule: "0 2 * * *",
 	command: "/usr/local/bin/backup.sh",
 	status: "active",
+	notify: false,
 	createdAt: "2026-03-30T00:00:00.000Z",
 };
 
@@ -118,6 +119,20 @@ describe("formatTaskDetails", () => {
 	test("does not show updatedAt when absent", () => {
 		const output = formatTaskDetails(sampleEnrichedTask);
 		expect(output).not.toContain("Updated:");
+	});
+
+	// @spec FR-054: Display notify status — .specs/features/008-failure-notifications/spec.md#fr-054
+	test("AC-073: shows 'Notify: off' when notify is false", () => {
+		const output = formatTaskDetails(sampleEnrichedTask);
+		expect(output).toContain("Notify:");
+		expect(output).toContain("off");
+	});
+
+	test("AC-073: shows 'Notify: on' when notify is true", () => {
+		const notifyTask: EnrichedTask = { ...sampleEnrichedTask, notify: true };
+		const output = formatTaskDetails(notifyTask);
+		expect(output).toContain("Notify:");
+		expect(output).toContain("on");
 	});
 });
 
