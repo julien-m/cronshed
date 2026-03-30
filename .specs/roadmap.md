@@ -15,7 +15,7 @@
 - [x] **Crontab sync** — Install/remove crontab entries from task manifest · Roles: Developer · Scope: M · Deps: task-manifest → [003-crontab-sync](features/003-crontab-sync/spec.md)
 - [x] **Auto-sync** — Auto-sync crontab after task mutations (add/remove/update), --no-sync escape hatch · Roles: Developer · Scope: S · Deps: crontab-sync → [004-auto-sync](features/004-auto-sync/spec.md)
 - [x] **Wrapper script generation** — Generate shell wrappers that log execution results · Roles: Developer · Scope: M · Deps: task-manifest → [005-wrapper-script-generation](features/005-wrapper-script-generation/spec.md)
-- [ ] **Task listing & status** — Display all tasks with status, last run, next execution · Roles: Developer · Scope: S · Deps: task-manifest, crontab-sync
+- [x] **Task listing & status** — Display all tasks with status, last run, next execution · Roles: Developer · Scope: S · Deps: task-manifest, crontab-sync → [006-task-listing-status](features/006-task-listing-status/spec.md)
 - [ ] **Execution history** — Record and display execution history (exit code, duration, stdout/stderr) · Roles: Developer · Scope: M · Deps: wrapper-scripts
 <!-- roadmap:mvp:end -->
 

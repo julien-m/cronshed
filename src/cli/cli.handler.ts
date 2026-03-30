@@ -26,6 +26,9 @@ import {
 import { WrapperService } from "../wrapper/wrapper.service";
 import { WrapperGenerationError } from "../wrapper/wrapper.errors";
 import { getDataDir } from "../app/config";
+import { getNextExecution } from "../cron/cron.service";
+import { getLastExecution } from "../log/log.service";
+import type { Task, EnrichedTask } from "../task/task.types";
 import { formatTaskTable, formatTaskDetails, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff } from "./cli.formatter";
 
 // @spec FR-022: Sync handler, FR-024: Dry-run display, FR-027: Error handling — .specs/features/003-crontab-sync/spec.md#fr-022
@@ -184,6 +187,7 @@ async function handleAdd(args: string[], service: TaskService, repo: TaskReposit
 	}
 }
 
+// @spec FR-007: Enrich tasks in list, FR-009: JSON output with enriched data — .specs/features/006-task-listing-status/spec.md#fr-007
 async function handleList(args: string[], service: TaskService): Promise<void> {
 	const { values } = parseArgs({
 		args,
@@ -193,28 +197,28 @@ async function handleList(args: string[], service: TaskService): Promise<void> {
 		allowPositionals: false,
 	});
 
-	let tasks;
-	try {
-		tasks = await service.list();
-	} catch (err) {
-		// If manifest doesn't exist, list returns empty
-		throw err;
-	}
-
-	if (values.json) {
-		console.log(JSON.stringify(tasks, null, "\t"));
-		return;
-	}
+	const tasks = await service.list();
 
 	if (tasks.length === 0) {
-		// Check if manifest file exists to give contextual message
-		console.log("No tasks configured. Run 'cronshed add' to create your first task.");
+		if (values.json) {
+			console.log(JSON.stringify([], null, "\t"));
+		} else {
+			console.log("No tasks configured. Run 'cronshed add' to create your first task.");
+		}
 		return;
 	}
 
-	console.log(formatTaskTable(tasks));
+	const enriched = await enrichTasks(tasks);
+
+	if (values.json) {
+		console.log(JSON.stringify(enriched, null, "\t"));
+		return;
+	}
+
+	console.log(formatTaskTable(enriched));
 }
 
+// @spec FR-008: Enrich task in get, FR-010: JSON output with enriched data — .specs/features/006-task-listing-status/spec.md#fr-008
 async function handleGet(args: string[], service: TaskService): Promise<void> {
 	const name = args[0];
 	if (!name) {
@@ -232,13 +236,14 @@ async function handleGet(args: string[], service: TaskService): Promise<void> {
 	});
 
 	const task = await service.get(name);
+	const enriched = await enrichTask(task);
 
 	if (values.json) {
-		console.log(JSON.stringify(task, null, "\t"));
+		console.log(JSON.stringify(enriched, null, "\t"));
 		return;
 	}
 
-	console.log(formatTaskDetails(task));
+	console.log(formatTaskDetails(enriched));
 }
 
 // @spec FR-031, FR-034: Auto-sync on update with --no-sync flag — .specs/features/004-auto-sync/spec.md#fr-031
@@ -311,6 +316,32 @@ async function handleRemove(args: string[], service: TaskService, repo: TaskRepo
 	if (!values["no-sync"]) {
 		await autoSync(repo);
 	}
+}
+
+/**
+ * Enrich a single task with last execution and next run data.
+ * @param task The raw task from the manifest
+ * @returns Enriched task with lastRun, lastExitCode, nextRun
+ */
+async function enrichTask(task: Task): Promise<EnrichedTask> {
+	const lastExec = await getLastExecution(task.name);
+	const nextRun = getNextExecution(task.schedule);
+
+	return {
+		...task,
+		lastRun: lastExec?.timestamp ?? null,
+		lastExitCode: lastExec?.exitCode ?? null,
+		nextRun: nextRun.toISOString(),
+	};
+}
+
+/**
+ * Enrich an array of tasks with last execution and next run data.
+ * @param tasks Array of raw tasks from the manifest
+ * @returns Array of enriched tasks
+ */
+async function enrichTasks(tasks: Task[]): Promise<EnrichedTask[]> {
+	return Promise.all(tasks.map((task) => enrichTask(task)));
 }
 
 const QUERY_SUBCOMMANDS: Record<string, (args: string[], service: TaskService) => Promise<void>> = {
