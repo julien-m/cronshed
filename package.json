@@ -1,13 +1,16 @@
 {
 	"name": "cronshed",
 	"module": "index.ts",
-	"type": "module",
-	"private": true,
 	"devDependencies": {
 		"@types/bun": "latest",
 		"typescript": "^5"
 	},
+	"private": true,
 	"scripts": {
 		"typecheck": "bunx tsc --noEmit"
+	},
+	"type": "module",
+	"dependencies": {
+		"cron-parser": "4"
 	}
 }

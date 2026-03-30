@@ -2,7 +2,7 @@
 
 > Specification registry for Cronshed. All artifacts produced by LiveSpec are indexed here.
 >
-> Last updated: 2026-03-30
+> Last updated: 2026-03-30 (001-task-manifest)
 
 ---
 
@@ -34,9 +34,8 @@
 <!-- readme:features:start -->
 | # | Feature | Status | Created | Updated | Spec |
 |---|---|---|---|---|---|
+| 001 | Task Manifest & CRUD | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/001-task-manifest/spec.md) |
 <!-- readme:features:end -->
-
-> No features yet. Create your first with `/spec.specify "feature description"`.
 
 ---
 
@@ -58,6 +57,7 @@
 <!-- readme:activity:start -->
 | Date | Type | Description |
 |---|---|---|
+| 2026-03-30 | Spec | [001] Spec created: Task Manifest & CRUD — 5 stories, 15 AC, 8 FR |
 | 2026-03-30 | Setup | LiveSpec initialized |
 <!-- readme:activity:end -->
 

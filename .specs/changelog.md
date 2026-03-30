@@ -4,6 +4,30 @@
 
 ---
 
+## 2026-03-30 — Feature: Task Manifest & CRUD implemented
+
+- **Type:** Feature Implemented
+- **Feature:** [001-task-manifest](features/001-task-manifest/implementation.md) — 61 tests, 19 AC, all passing
+- **Author:** tool (spec.feature --auto)
+
+---
+
+## 2026-03-30 — Plan: Task Manifest & CRUD
+
+- **Type:** Plan Created
+- **Feature:** [001-task-manifest](features/001-task-manifest/plan.md) — 7 implementation steps, 3 diagrams (ER + state + sequence)
+- **Author:** tool (spec.feature --auto)
+
+---
+
+## 2026-03-30 — Spec: Task Manifest & CRUD
+
+- **Type:** Spec Created
+- **Feature:** [001-task-manifest](features/001-task-manifest/spec.md) — 5 stories, 15 AC, 8 FR
+- **Author:** tool (spec.feature --auto)
+
+---
+
 ## 2026-03-30 — Setup: LiveSpec initialized
 
 - **Type:** Setup
