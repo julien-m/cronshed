@@ -1,9 +1,11 @@
 // @spec FR-006: JSON output, FR-008: Error formatting — .specs/features/001-task-manifest/spec.md#fr-006
 // @spec FR-024: Sync diff display, FR-035: Sync summary — .specs/features/003-crontab-sync/spec.md#fr-024
+// @spec FR-070: Diagnosis report formatting — .specs/features/010-task-diagnosis/spec.md#fr-070
 
 import type { Task, EnrichedTask } from "../task/task.types";
 import type { SyncResult, SyncDiffEntry } from "../crontab/sync.service";
 import type { ExecutionLogEntry } from "../log/log.types";
+import type { DiagnosisResult } from "../diagnosis/diagnosis.types";
 
 // ANSI color codes for terminal output (convention: signal/noise maximal, colors for semantic meaning)
 // Respects NO_COLOR environment variable per spec: colors disabled only when NO_COLOR is set AND non-empty
@@ -314,4 +316,50 @@ export function formatHistoryTable(entries: ExecutionLogEntry[]): string {
 	);
 
 	return [headerLine, ...dataLines].join("\n");
+}
+
+/**
+ * Format diagnosis results as a color-coded report.
+ * Green checkmark for healthy tasks, red/yellow for issues with details.
+ * @spec FR-070: Diagnosis report formatting — .specs/features/010-task-diagnosis/spec.md#fr-070
+ * @param results Array of diagnosis results
+ * @returns Formatted report string
+ */
+export function formatDiagnosisReport(results: DiagnosisResult[]): string {
+	const lines: string[] = [];
+
+	for (const result of results) {
+		if (result.status === "ok") {
+			lines.push(`${ANSI_GREEN}\u2713${ANSI_RESET} ${result.taskName}`);
+		} else {
+			lines.push(`${ANSI_RED}\u2717${ANSI_RESET} ${result.taskName}`);
+			for (const issue of result.issues) {
+				const color = issue.severity === "error" ? ANSI_RED : ANSI_YELLOW;
+				const prefix = issue.severity === "error" ? "  \u2717" : "  \u26A0";
+				lines.push(`${color}${prefix}${ANSI_RESET} ${issue.message}`);
+				if (issue.hint) {
+					lines.push(`${color}    \u2192${ANSI_RESET} ${issue.hint}`);
+				}
+			}
+		}
+	}
+
+	lines.push("");
+	lines.push(formatDiagnosisSummary(results));
+
+	return lines.join("\n");
+}
+
+/**
+ * Format a one-line summary of diagnosis results.
+ * @param results Array of diagnosis results
+ * @returns Summary string (e.g., "3 tasks checked, 2 ok, 1 with issues")
+ */
+export function formatDiagnosisSummary(results: DiagnosisResult[]): string {
+	const total = results.length;
+	const ok = results.filter((r) => r.status === "ok").length;
+	const withIssues = total - ok;
+
+	const taskWord = total === 1 ? "task" : "tasks";
+	return `${total} ${taskWord} checked, ${ok} ok, ${withIssues} with issues`;
 }

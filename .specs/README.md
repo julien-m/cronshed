@@ -2,7 +2,7 @@
 
 > Specification registry for Cronshed. All artifacts produced by LiveSpec are indexed here.
 >
-> Last updated: 2026-03-30 (009-task-pause-resume)
+> Last updated: 2026-03-30 (010-task-diagnosis)
 
 ---
 
@@ -43,6 +43,7 @@
 | 007 | Execution History | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/007-execution-history/spec.md) |
 | 008 | Failure Notifications | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/008-failure-notifications/spec.md) |
 | 009 | Task Pause/Resume | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/009-task-pause-resume/spec.md) |
+| 010 | Task Diagnosis | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/010-task-diagnosis/spec.md) |
 <!-- readme:features:end -->
 
 ---
@@ -65,6 +66,7 @@
 <!-- readme:activity:start -->
 | Date | Type | Description |
 |---|---|---|
+| 2026-03-30 | Feature | [010] Implemented: Task Diagnosis — 6 stories, 15 AC, 11 FR, 313 tests |
 | 2026-03-30 | Feature | [009] Implemented: Task Pause/Resume — 5 stories, 13 AC, 8 FR, 281 tests |
 | 2026-03-30 | Feature | [008] Implemented: Failure Notifications — 5 stories, 12 AC, 9 FR, 244 tests |
 | 2026-03-30 | Feature | [007] Implemented: Execution History — 5 stories, 13 AC, 10 FR, 223 tests |

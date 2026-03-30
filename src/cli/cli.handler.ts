@@ -32,8 +32,9 @@ import { getNextExecution } from "../cron/cron.service";
 import { getLastExecution } from "../log/log.service";
 import type { Task, EnrichedTask } from "../task/task.types";
 import { TASK_STATUS } from "../task/task.types";
-import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff } from "./cli.formatter";
+import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff, formatDiagnosisReport } from "./cli.formatter";
 import { getExecutionHistory } from "../log/log.service";
+import { DiagnosisService } from "../diagnosis/diagnosis.service";
 
 // @spec FR-022: Sync handler, FR-024: Dry-run display, FR-027: Error handling — .specs/features/003-crontab-sync/spec.md#fr-022
 async function handleSync(args: string[]): Promise<void> {
@@ -472,6 +473,59 @@ async function handleHistory(args: string[], service: TaskService): Promise<void
 	console.log(formatHistoryTable(limited));
 }
 
+// @spec FR-069: Doctor CLI handler, FR-071: Exit codes, FR-072: JSON output — .specs/features/010-task-diagnosis/spec.md#fr-069
+async function handleDoctor(args: string[]): Promise<void> {
+	// Parse optional task name and --json flag
+	// The name is the first positional arg (if it doesn't start with --)
+	const name = args[0] && !args[0].startsWith("--") ? args[0] : undefined;
+	const restArgs = name ? args.slice(1) : args;
+
+	const { values } = parseArgs({
+		args: restArgs,
+		options: {
+			json: { type: "boolean", default: false },
+		},
+		allowPositionals: false,
+	});
+
+	const repo = new TaskRepository();
+	const adapter = new CrontabAdapter();
+	const wrapperService = new WrapperService(getDataDir());
+	const diagnosisService = new DiagnosisService(repo, adapter, wrapperService, getDataDir());
+	const taskService = new TaskService(repo);
+
+	let results;
+	if (name) {
+		// Validate task exists
+		const task = await taskService.get(name);
+		const result = await diagnosisService.diagnose(task);
+		results = [result];
+	} else {
+		results = await diagnosisService.diagnoseAll();
+	}
+
+	if (results.length === 0) {
+		if (values.json) {
+			console.log(JSON.stringify([], null, "\t"));
+		} else {
+			console.log("No tasks configured. Run 'cronshed add' to create your first task.");
+		}
+		return;
+	}
+
+	if (values.json) {
+		console.log(JSON.stringify(results, null, "\t"));
+	} else {
+		console.log(formatDiagnosisReport(results));
+	}
+
+	// Exit 1 if any issues found
+	const hasIssues = results.some((r) => r.status === "issues");
+	if (hasIssues) {
+		process.exit(1);
+	}
+}
+
 const QUERY_SUBCOMMANDS: Record<string, (args: string[], service: TaskService) => Promise<void>> = {
 	list: handleList,
 	get: handleGet,
@@ -489,6 +543,7 @@ const MUTATION_SUBCOMMANDS: Record<string, (args: string[], service: TaskService
 /** Commands that manage their own dependencies (no shared TaskService). */
 const STANDALONE_COMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 	sync: handleSync,
+	doctor: handleDoctor,
 };
 
 /**
@@ -513,6 +568,7 @@ export async function runCli(argv: string[]): Promise<void> {
 		console.log("  resume <name> [--no-sync]                                     Resume a paused task");
 		console.log("  history <name> [--limit N] [--json]                            Show execution history");
 		console.log("  sync [--dry-run] [--clear]                                    Sync tasks to crontab");
+		console.log("  doctor [name] [--json]                                         Diagnose task issues");
 		return;
 	}
 
