@@ -61,6 +61,29 @@ describe("TaskService.add", () => {
 		expect(service.add({ name: "space-cmd", schedule: "0 0 * * *", command: "   " })).rejects.toThrow(EmptyCommandError);
 	});
 
+	// @spec FR-047: Default notify to false — .specs/features/008-failure-notifications/spec.md#fr-047
+	test("AC-067: creates task with notify false by default", async () => {
+		const task = await service.add({
+			name: "no-notify",
+			schedule: "0 0 * * *",
+			command: "echo test",
+		});
+
+		expect(task.notify).toBe(false);
+	});
+
+	// @spec FR-047: Notify field — .specs/features/008-failure-notifications/spec.md#fr-047
+	test("AC-066: creates task with notify true when provided", async () => {
+		const task = await service.add({
+			name: "with-notify",
+			schedule: "0 0 * * *",
+			command: "echo test",
+			notify: true,
+		});
+
+		expect(task.notify).toBe(true);
+	});
+
 	test("AC-004: creates directory and manifest on first add", async () => {
 		const deepDir = join(tmpDir, "sub", "deep");
 		const repo = new TaskRepository(join(deepDir, "tasks.json"));
@@ -138,6 +161,20 @@ describe("TaskService.update", () => {
 
 	test("throws for non-existent task", async () => {
 		expect(service.update("ghost", { schedule: "0 0 * * *" })).rejects.toThrow(TaskNotFoundError);
+	});
+
+	// @spec FR-047: Update notify field — .specs/features/008-failure-notifications/spec.md#fr-047
+	test("AC-068: updates notify to true", async () => {
+		await service.add({ name: "my-task", schedule: "0 2 * * *", command: "echo hi" });
+		const updated = await service.update("my-task", { notify: true });
+		expect(updated.notify).toBe(true);
+		expect(updated.updatedAt).toBeDefined();
+	});
+
+	test("AC-069: updates notify to false", async () => {
+		await service.add({ name: "my-task", schedule: "0 2 * * *", command: "echo hi", notify: true });
+		const updated = await service.update("my-task", { notify: false });
+		expect(updated.notify).toBe(false);
 	});
 });
 

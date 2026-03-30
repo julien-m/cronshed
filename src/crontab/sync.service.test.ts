@@ -13,6 +13,7 @@ function buildTask(overrides?: Partial<Task>): Task {
 		schedule: "0 2 * * *",
 		command: "/usr/local/bin/test.sh",
 		status: "active",
+		notify: false,
 		createdAt: new Date().toISOString(),
 		...overrides,
 	};

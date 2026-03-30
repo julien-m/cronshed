@@ -39,12 +39,14 @@ export class TaskService {
 			throw new DuplicateTaskNameError(input.name);
 		}
 
+		// @spec FR-047: Default notify to false — .specs/features/008-failure-notifications/spec.md#fr-047
 		const task: Task = {
 			id: crypto.randomUUID(),
 			name: input.name,
 			schedule: input.schedule,
 			command: input.command,
 			status: "active",
+			notify: input.notify ?? false,
 			createdAt: new Date().toISOString(),
 		};
 
@@ -91,8 +93,9 @@ export class TaskService {
 	async update(name: string, input: UpdateTaskInput): Promise<Task> {
 		const hasSchedule = input.schedule !== undefined;
 		const hasCommand = input.command !== undefined;
+		const hasNotify = input.notify !== undefined;
 
-		if (!hasSchedule && !hasCommand) {
+		if (!hasSchedule && !hasCommand && !hasNotify) {
 			throw new NoChangesSpecifiedError();
 		}
 
@@ -115,6 +118,10 @@ export class TaskService {
 		}
 		if (hasCommand) {
 			task.command = input.command!;
+		}
+		// @spec FR-047: Update notify field — .specs/features/008-failure-notifications/spec.md#fr-047
+		if (hasNotify) {
+			task.notify = input.notify!;
 		}
 		task.updatedAt = new Date().toISOString();
 

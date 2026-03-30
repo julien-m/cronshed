@@ -150,6 +150,7 @@ async function handleAdd(args: string[], service: TaskService, repo: TaskReposit
 		options: {
 			schedule: { type: "string", short: "s" },
 			command: { type: "string", short: "c" },
+			notify: { type: "boolean", default: false },
 			"no-sync": { type: "boolean", default: false },
 		},
 		allowPositionals: false,
@@ -167,10 +168,12 @@ async function handleAdd(args: string[], service: TaskService, repo: TaskReposit
 	// @spec FR-016: Include resolved path in success message, FR-017: Path resolution on add — .specs/features/002-command-path-resolution/spec.md#fr-016
 	const resolution = await resolveCommand(values.command);
 
+	// @spec FR-051: Pass notify flag to task creation — .specs/features/008-failure-notifications/spec.md#fr-051
 	const task = await service.add({
 		name,
 		schedule: values.schedule,
 		command: resolution.resolved,
+		notify: values.notify ?? false,
 	});
 
 	// @spec FR-042: Generate wrapper on add — .specs/features/005-wrapper-script-generation/spec.md#fr-042
@@ -255,11 +258,14 @@ async function handleUpdate(args: string[], service: TaskService, repo: TaskRepo
 		process.exit(2);
 	}
 
+	// @spec FR-052: Accept --notify and --no-notify flags — .specs/features/008-failure-notifications/spec.md#fr-052
 	const { values } = parseArgs({
 		args: args.slice(1),
 		options: {
 			schedule: { type: "string", short: "s" },
 			command: { type: "string", short: "c" },
+			notify: { type: "boolean" },
+			"no-notify": { type: "boolean" },
 			"no-sync": { type: "boolean", default: false },
 		},
 		allowPositionals: false,
@@ -272,13 +278,18 @@ async function handleUpdate(args: string[], service: TaskService, repo: TaskRepo
 		resolvedCommand = resolution.resolved;
 	}
 
+	// Resolve notify: --notify wins over --no-notify, undefined if neither
+	const notifyValue = values.notify === true ? true : values["no-notify"] === true ? false : undefined;
+
 	const task = await service.update(name, {
 		schedule: values.schedule,
 		command: resolvedCommand,
+		notify: notifyValue,
 	});
 
-	// @spec FR-042: Regenerate wrapper only on command change — .specs/features/005-wrapper-script-generation/spec.md#fr-042
-	if (values.command) {
+	// @spec FR-042: Regenerate wrapper on command or notify change — .specs/features/005-wrapper-script-generation/spec.md#fr-042
+	// @spec FR-052: Regenerate wrapper when notify changes — .specs/features/008-failure-notifications/spec.md#fr-052
+	if (values.command || notifyValue !== undefined) {
 		const wrapperService = new WrapperService(getDataDir());
 		await wrapperService.generate(task);
 	}
@@ -433,10 +444,10 @@ export async function runCli(argv: string[]): Promise<void> {
 		console.log("Usage: cronshed <command> [options]");
 		console.log("");
 		console.log("Commands:");
-		console.log("  add <name> --schedule '<cron>' --command '<cmd>' [--no-sync]   Add a task");
+		console.log("  add <name> --schedule '<cron>' --command '<cmd>' [--notify] [--no-sync]   Add a task");
 		console.log("  list [--json]                                                  List all tasks");
 		console.log("  get <name> [--json]                                            Show task details");
-		console.log("  update <name> [--schedule '<cron>'] [--command '<cmd>'] [--no-sync]  Update a task");
+		console.log("  update <name> [--schedule '<cron>'] [--command '<cmd>'] [--notify|--no-notify] [--no-sync]  Update a task");
 		console.log("  remove <name> [--no-sync]                                     Remove a task");
 		console.log("  history <name> [--limit N] [--json]                            Show execution history");
 		console.log("  sync [--dry-run] [--clear]                                    Sync tasks to crontab");

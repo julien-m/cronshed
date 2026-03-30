@@ -24,7 +24,7 @@
 ## Post-MVP
 
 <!-- roadmap:postmvp:start -->
-- [ ] **Failure notifications** — Send Telegram alert via cc-hub on task failure · Roles: Developer · Scope: S · Deps: wrapper-scripts
+- [x] **Failure notifications** — Send Telegram alert via cc-hub on task failure · Roles: Developer · Scope: S · Deps: wrapper-scripts → [008-failure-notifications](features/008-failure-notifications/spec.md)
 - [ ] **Task pause/resume** — Temporarily disable a task without removing it · Roles: Developer · Scope: S · Deps: task-manifest, crontab-sync
 - [ ] **Task diagnosis** — Detect common misconfigurations (bad cron expr, missing script, permission issues) · Roles: Developer · Scope: S · Deps: task-manifest
 - [ ] **Import existing crontab** — Parse current crontab and import entries into tasks.json · Roles: Developer · Scope: M · Deps: task-manifest, crontab-sync
