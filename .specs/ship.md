@@ -15,5 +15,5 @@
 | 6 | 010-task-diagnosis | Done | feature/010-task-diagnosis | 2026-03-30 | 2026-03-30 |
 | 7 | 011-import-existing-crontab | Done | feature/011-import-existing-crontab | 2026-03-30 | 2026-03-30 |
 | 8 | 012-log-rotation | Done | feature/012-log-rotation | 2026-03-30 | 2026-03-30 |
-| 9 | 013-task-groups-tags | Pending | — | — | — |
-| 10 | 014-dry-run-mode | Pending | — | — | — |
+| 9 | 013-task-groups-tags | Done | feature/013-task-groups-tags | 2026-03-30 | 2026-03-30 |
+| 10 | 014-dry-run-mode | In Progress | feature/014-dry-run-mode | 2026-03-30 | — |

@@ -33,7 +33,7 @@ import { getNextExecution } from "../cron/cron.service";
 import { getLastExecution } from "../log/log.service";
 import type { Task, EnrichedTask } from "../task/task.types";
 import { TASK_STATUS } from "../task/task.types";
-import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff, formatDiagnosisReport, formatImportPreview, formatImportSummary, formatSkippedWarning, formatRotationSummary, formatTagsTable } from "./cli.formatter";
+import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff, formatDiagnosisReport, formatImportPreview, formatImportSummary, formatSkippedWarning, formatRotationSummary, formatTagsTable, formatRunSummary } from "./cli.formatter";
 import { importCrontabEntries } from "../import/import.service";
 import { getExecutionHistory } from "../log/log.service";
 import { DiagnosisService } from "../diagnosis/diagnosis.service";
@@ -721,6 +721,72 @@ async function handleTags(args: string[], service: TaskService): Promise<void> {
 	console.log(formatTagsTable(tagCounts));
 }
 
+// @spec FR-001: Run command handler — .specs/features/014-dry-run-mode/spec.md#fr-001
+// @spec FR-002: Task lookup — .specs/features/014-dry-run-mode/spec.md#fr-002
+// @spec FR-003: Wrapper auto-generation — .specs/features/014-dry-run-mode/spec.md#fr-003
+// @spec FR-004: Real-time output streaming — .specs/features/014-dry-run-mode/spec.md#fr-004
+// @spec FR-005: Exit code and duration capture — .specs/features/014-dry-run-mode/spec.md#fr-005
+// @spec FR-007: JSON output mode — .specs/features/014-dry-run-mode/spec.md#fr-007
+// @spec FR-008: Exit code propagation — .specs/features/014-dry-run-mode/spec.md#fr-008
+// @spec FR-009: Usage error — .specs/features/014-dry-run-mode/spec.md#fr-009
+async function handleRun(args: string[]): Promise<void> {
+	const name = args[0] && !args[0].startsWith("--") ? args[0] : undefined;
+	const restArgs = name ? args.slice(1) : args;
+
+	if (!name) {
+		console.error(formatError("Missing task name", "Usage: cronshed run <name> [--json]"));
+		process.exit(2);
+	}
+
+	const { values } = parseArgs({
+		args: restArgs,
+		options: {
+			json: { type: "boolean", default: false },
+		},
+		allowPositionals: false,
+	});
+
+	const repo = new TaskRepository();
+	const service = new TaskService(repo);
+	const wrapperService = new WrapperService(getDataDir());
+
+	// Lookup task (throws TaskNotFoundError if missing)
+	const task = await service.get(name);
+
+	// Ensure wrapper exists, generate if missing
+	const wrapperPath = wrapperService.getWrapperPath(task.name);
+	const wrapperExists = await Bun.file(wrapperPath).exists();
+
+	if (!wrapperExists) {
+		await wrapperService.generate(task);
+		console.error(formatSuccess(`Wrapper generated for ${task.name}`));
+	}
+
+	// Spawn wrapper with inherited stdio for real-time streaming
+	const startTime = Date.now();
+	const proc = Bun.spawn([wrapperPath], {
+		stdout: "inherit",
+		stderr: "inherit",
+		env: { ...process.env },
+	});
+
+	const exitCode = await proc.exited;
+	const durationMs = Date.now() - startTime;
+
+	// Output summary
+	if (values.json) {
+		console.log(JSON.stringify({
+			taskName: task.name,
+			exitCode,
+			durationMs,
+		}, null, "\t"));
+	} else {
+		console.log(formatRunSummary(task.name, exitCode, durationMs));
+	}
+
+	process.exit(exitCode);
+}
+
 const QUERY_SUBCOMMANDS: Record<string, (args: string[], service: TaskService) => Promise<void>> = {
 	list: handleList,
 	get: handleGet,
@@ -737,11 +803,13 @@ const MUTATION_SUBCOMMANDS: Record<string, (args: string[], service: TaskService
 };
 
 /** Commands that manage their own dependencies (no shared TaskService). */
+// @spec FR-010: Register run command — .specs/features/014-dry-run-mode/spec.md#fr-010
 const STANDALONE_COMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 	sync: handleSync,
 	doctor: handleDoctor,
 	import: handleImport,
 	rotate: handleRotate,
+	run: handleRun,
 };
 
 /**
@@ -771,6 +839,7 @@ export async function runCli(argv: string[]): Promise<void> {
 		console.log("  doctor [name] [--json]                                         Diagnose task issues");
 		console.log("  import [--dry-run] [--prefix <name>]                              Import crontab entries");
 		console.log("  rotate [name] [--max-age <days>] [--max-entries <N>] [--dry-run] [--json]  Rotate execution logs");
+		console.log("  run <name> [--json]                                            Run a task immediately");
 		return;
 	}
 

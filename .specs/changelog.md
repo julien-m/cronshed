@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-03-30 — Feature: Dry-run Mode implemented
+
+- **Type:** Feature Implemented
+- **Feature:** [014-dry-run-mode](features/014-dry-run-mode/implementation.md) — 447 tests total (all pass), 12 AC, 11 FR
+- **Author:** tool (spec.feature --auto)
+
+---
+
 ## 2026-03-30 — Feature: Task Groups/Tags implemented
 
 - **Type:** Feature Implemented
