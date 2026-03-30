@@ -12,7 +12,7 @@
 <!-- roadmap:mvp:start -->
 - [x] **Task manifest & CRUD** — Create, read, update, delete tasks in tasks.json · Roles: Developer · Scope: M · Deps: none → [001-task-manifest](features/001-task-manifest/spec.md)
 - [x] **Command path resolution** — Resolve relative paths to absolute, validate file existence and permissions at add/update time · Roles: Developer · Scope: S · Deps: task-manifest → [002-command-path-resolution](features/002-command-path-resolution/spec.md)
-- [ ] **Crontab sync** — Install/remove crontab entries from task manifest · Roles: Developer · Scope: M · Deps: task-manifest
+- [x] **Crontab sync** — Install/remove crontab entries from task manifest · Roles: Developer · Scope: M · Deps: task-manifest → [003-crontab-sync](features/003-crontab-sync/spec.md)
 - [ ] **Wrapper script generation** — Generate shell wrappers that log execution results · Roles: Developer · Scope: M · Deps: task-manifest
 - [ ] **Task listing & status** — Display all tasks with status, last run, next execution · Roles: Developer · Scope: S · Deps: task-manifest, crontab-sync
 - [ ] **Execution history** — Record and display execution history (exit code, duration, stdout/stderr) · Roles: Developer · Scope: M · Deps: wrapper-scripts

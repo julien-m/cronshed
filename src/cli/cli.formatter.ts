@@ -1,6 +1,8 @@
 // @spec FR-006: JSON output, FR-008: Error formatting — .specs/features/001-task-manifest/spec.md#fr-006
+// @spec FR-024: Sync diff display, FR-035: Sync summary — .specs/features/003-crontab-sync/spec.md#fr-024
 
 import type { Task } from "../task/task.types";
+import type { SyncResult, SyncDiffEntry } from "../crontab/sync.service";
 
 /**
  * Format an array of tasks as a CLI table with dynamic column widths.
@@ -48,7 +50,11 @@ export function formatTaskDetails(task: Task): string {
 	return lines.join("\n");
 }
 
-/** Format a success message prefixed with ✓. */
+/**
+ * Format a success message prefixed with ✓.
+ * @param message The success message to display
+ * @returns Formatted success string with checkmark prefix
+ */
 export function formatSuccess(message: string): string {
 	return `\u2713 ${message}`;
 }
@@ -64,4 +70,61 @@ export function formatError(message: string, hint?: string): string {
 		output += `\n\u2192 ${hint}`;
 	}
 	return output;
+}
+
+/**
+ * Format the sync result summary message.
+ * @param result The sync result
+ * @param isClear Whether --clear was used
+ * @returns Formatted summary string
+ */
+export function formatSyncResult(result: SyncResult, isClear: boolean): string {
+	if (isClear) {
+		if (result.isUpToDate) {
+			return formatSuccess("No cronshed entries to remove");
+		}
+		return formatSuccess(`Removed ${result.removed} cronshed ${result.removed === 1 ? "entry" : "entries"} from crontab`);
+	}
+
+	if (result.isUpToDate) {
+		return formatSuccess(`Crontab is up to date (${result.total} ${result.total === 1 ? "task" : "tasks"})`);
+	}
+
+	return formatSuccess(
+		`Synced ${result.total} ${result.total === 1 ? "task" : "tasks"} to crontab (${result.installed} installed, ${result.updated} updated, ${result.removed} removed)`
+	);
+}
+
+/**
+ * Format the sync diff for dry-run display.
+ * Uses +/~/- prefixes for install/update/remove operations.
+ * @param diff Array of diff entries
+ * @returns Formatted diff string
+ */
+export function formatSyncDiff(diff: SyncDiffEntry[]): string {
+	const lines: string[] = [];
+
+	for (const entry of diff) {
+		switch (entry.type) {
+			case "install":
+				lines.push(`+ ${entry.taskName}  ${entry.schedule}  ${entry.command}`);
+				break;
+			case "update": {
+				const changes: string[] = [];
+				if (entry.oldSchedule !== entry.schedule) {
+					changes.push(`${entry.oldSchedule} \u2192 ${entry.schedule}`);
+				}
+				if (entry.oldCommand !== entry.command) {
+					changes.push(`${entry.oldCommand} \u2192 ${entry.command}`);
+				}
+				lines.push(`~ ${entry.taskName}  ${changes.join(", ")}`);
+				break;
+			}
+			case "remove":
+				lines.push(`- ${entry.taskName}  ${entry.schedule}  ${entry.command}`);
+				break;
+		}
+	}
+
+	return lines.join("\n");
 }

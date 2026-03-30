@@ -3,6 +3,9 @@
 import { parseArgs } from "node:util";
 import { TaskService } from "../task/task.service";
 import { TaskRepository } from "../task/task.repository";
+import { SyncService } from "../crontab/sync.service";
+import { CrontabAdapter } from "../crontab/crontab.adapter";
+import { CrontabReadError, CrontabWriteError } from "../crontab/crontab.errors";
 import { InvalidCronExpressionError } from "../cron/cron.errors";
 import {
 	TaskNotFoundError,
@@ -20,7 +23,35 @@ import {
 	CommandFileNotExecutableError,
 	CommandPathIsDirectoryError,
 } from "./command.errors";
-import { formatTaskTable, formatTaskDetails, formatSuccess, formatError } from "./cli.formatter";
+import { formatTaskTable, formatTaskDetails, formatSuccess, formatError, formatSyncResult, formatSyncDiff } from "./cli.formatter";
+
+// @spec FR-022: Sync handler, FR-024: Dry-run display, FR-027: Error handling — .specs/features/003-crontab-sync/spec.md#fr-022
+async function handleSync(args: string[]): Promise<void> {
+	const { values } = parseArgs({
+		args,
+		options: {
+			"dry-run": { type: "boolean", default: false },
+			clear: { type: "boolean", default: false },
+		},
+		allowPositionals: false,
+	});
+
+	const repo = new TaskRepository();
+	const adapter = new CrontabAdapter();
+	const syncService = new SyncService(repo, adapter);
+
+	const result = await syncService.sync({
+		dryRun: values["dry-run"],
+		clear: values.clear,
+	});
+
+	if (!result.isUpToDate && values["dry-run"]) {
+		console.log(formatSyncDiff(result.diff));
+		return;
+	}
+
+	console.log(formatSyncResult(result, values.clear ?? false));
+}
 
 function getExitCode(err: unknown): number {
 	if (
@@ -33,7 +64,10 @@ function getExitCode(err: unknown): number {
 	) {
 		return 2;
 	}
-	if (err instanceof ManifestCorruptedError || err instanceof ManifestVersionError || err instanceof ManifestAccessError) {
+	if (
+		err instanceof ManifestCorruptedError || err instanceof ManifestVersionError || err instanceof ManifestAccessError ||
+		err instanceof CrontabReadError || err instanceof CrontabWriteError
+	) {
 		return 3;
 	}
 	if (err instanceof TaskNotFoundError || err instanceof DuplicateTaskNameError) {
@@ -57,6 +91,9 @@ function getErrorHint(err: unknown): string | undefined {
 	}
 	if (err instanceof ManifestAccessError) {
 		return `Check permissions for: ${err.path}`;
+	}
+	if (err instanceof CrontabReadError || err instanceof CrontabWriteError) {
+		return "Check crontab permissions or run 'crontab -e' to verify access";
 	}
 	if (err instanceof CommandFileNotFoundError) {
 		return `Resolved to: ${err.resolved}`;
@@ -217,6 +254,11 @@ const SUBCOMMANDS: Record<string, (args: string[], service: TaskService) => Prom
 	remove: handleRemove,
 };
 
+/** Commands that manage their own dependencies (no shared TaskService). */
+const STANDALONE_COMMANDS: Record<string, (args: string[]) => Promise<void>> = {
+	sync: handleSync,
+};
+
 /**
  * Main CLI entry point. Parses subcommand from argv and dispatches to the appropriate handler.
  * Catches all domain errors, formats them to stderr, and exits with mapped status codes.
@@ -235,6 +277,22 @@ export async function runCli(argv: string[]): Promise<void> {
 		console.log("  get <name> [--json]                                Show task details");
 		console.log("  update <name> [--schedule '<cron>'] [--command '<cmd>']  Update a task");
 		console.log("  remove <name>                                      Remove a task");
+		console.log("  sync [--dry-run] [--clear]                         Sync tasks to crontab");
+		return;
+	}
+
+	// Standalone commands (manage their own dependencies)
+	const standalone = STANDALONE_COMMANDS[subcommand];
+	if (standalone) {
+		try {
+			await standalone(args);
+		} catch (err) {
+			const code = getExitCode(err);
+			const hint = getErrorHint(err);
+			const message = err instanceof Error ? err.message : String(err);
+			console.error(formatError(message, hint));
+			process.exit(code);
+		}
 		return;
 	}
 

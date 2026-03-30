@@ -2,7 +2,7 @@
 
 > Specification registry for Cronshed. All artifacts produced by LiveSpec are indexed here.
 >
-> Last updated: 2026-03-30 (002-command-path-resolution)
+> Last updated: 2026-03-30 (003-crontab-sync)
 
 ---
 
@@ -36,6 +36,7 @@
 |---|---|---|---|---|---|
 | 001 | Task Manifest & CRUD | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/001-task-manifest/spec.md) |
 | 002 | Command Path Resolution | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/002-command-path-resolution/spec.md) |
+| 003 | Crontab Sync | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/003-crontab-sync/spec.md) |
 <!-- readme:features:end -->
 
 ---
@@ -58,6 +59,7 @@
 <!-- readme:activity:start -->
 | Date | Type | Description |
 |---|---|---|
+| 2026-03-30 | Feature | [003] Implemented: Crontab Sync — 3 stories, 12 AC, 9 FR, 31 tests |
 | 2026-03-30 | Spec | [001] Spec created: Task Manifest & CRUD — 5 stories, 15 AC, 8 FR |
 | 2026-03-30 | Setup | LiveSpec initialized |
 <!-- readme:activity:end -->

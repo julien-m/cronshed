@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-03-30 — Feature: Crontab Sync implemented
+
+- **Type:** Feature Implemented
+- **Feature:** [003-crontab-sync](features/003-crontab-sync/implementation.md) — 31 tests, 12 AC, all passing
+- **Author:** tool (spec.feature --auto)
+
+---
+
 ## 2026-03-30 — Feature: Command Path Resolution implemented
 
 - **Type:** Feature Implemented
