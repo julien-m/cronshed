@@ -1,12 +1,14 @@
 // @spec FR-006: JSON output, FR-008: Error formatting — .specs/features/001-task-manifest/spec.md#fr-006
 // @spec FR-024: Sync diff display, FR-035: Sync summary — .specs/features/003-crontab-sync/spec.md#fr-024
 // @spec FR-070: Diagnosis report formatting — .specs/features/010-task-diagnosis/spec.md#fr-070
+// @spec FR-007: Rotation summary formatting — .specs/features/012-log-rotation/spec.md#fr-007
 
 import type { Task, EnrichedTask } from "../task/task.types";
 import type { SyncResult, SyncDiffEntry } from "../crontab/sync.service";
 import type { ExecutionLogEntry } from "../log/log.types";
 import type { DiagnosisResult } from "../diagnosis/diagnosis.types";
 import type { ImportResult, ImportedEntry, SkippedEntry } from "../import/import.types";
+import type { RotationResult } from "../log/rotation.types";
 
 // ANSI color codes for terminal output (convention: signal/noise maximal, colors for semantic meaning)
 // Respects NO_COLOR environment variable per spec: colors disabled only when NO_COLOR is set AND non-empty
@@ -416,4 +418,43 @@ export function formatImportSummary(result: ImportResult): string {
  */
 export function formatSkippedWarning(entry: SkippedEntry): string {
 	return formatWarning(`Skipped: ${entry.reason}`, entry.line);
+}
+
+// @spec FR-007: Rotation summary formatting — .specs/features/012-log-rotation/spec.md#fr-007
+
+/**
+ * Format rotation results as a summary string.
+ * Shows per-task stats and a total summary line.
+ * @param results Array of rotation results
+ * @param dryRun Whether this was a dry-run (prefixes output with "Would remove")
+ * @returns Formatted summary string
+ */
+export function formatRotationSummary(results: RotationResult[], dryRun: boolean): string {
+	const withRemovals = results.filter((r) => r.entriesRemoved > 0);
+
+	if (withRemovals.length === 0) {
+		return "Nothing to rotate";
+	}
+
+	const lines: string[] = [];
+	const verb = dryRun ? "Would remove" : "Removed";
+
+	for (const result of withRemovals) {
+		const entryWord = result.entriesRemoved === 1 ? "entry" : "entries";
+		lines.push(`  ${result.taskName}: ${verb} ${result.entriesRemoved} ${entryWord} (${result.entriesBefore} \u2192 ${result.entriesAfter})`);
+	}
+
+	const totalRemoved = withRemovals.reduce((sum, r) => sum + r.entriesRemoved, 0);
+	const taskWord = withRemovals.length === 1 ? "task" : "tasks";
+	const totalEntryWord = totalRemoved === 1 ? "entry" : "entries";
+
+	if (dryRun) {
+		lines.push("");
+		lines.push(`Would remove ${totalRemoved} ${totalEntryWord} across ${withRemovals.length} ${taskWord}`);
+	} else {
+		lines.push("");
+		lines.push(formatSuccess(`${verb} ${totalRemoved} ${totalEntryWord} across ${withRemovals.length} ${taskWord}`));
+	}
+
+	return lines.join("\n");
 }
