@@ -1,7 +1,7 @@
 // @spec FR-006: JSON output, FR-008: Error formatting — .specs/features/001-task-manifest/spec.md#fr-006
 // @spec FR-024: Sync diff display, FR-035: Sync summary — .specs/features/003-crontab-sync/spec.md#fr-024
 
-import type { Task } from "../task/task.types";
+import type { Task, EnrichedTask } from "../task/task.types";
 import type { SyncResult, SyncDiffEntry } from "../crontab/sync.service";
 
 // ANSI color codes for terminal output (convention: signal/noise maximal, colors for semantic meaning)
@@ -14,17 +14,25 @@ const ANSI_YELLOW = SUPPORTS_COLOR ? "\x1b[33m" : "";
 const ANSI_RESET = SUPPORTS_COLOR ? "\x1b[0m" : "";
 
 /**
- * Format an array of tasks as a CLI table with dynamic column widths.
- * @param tasks Array of tasks to display
+ * Format an array of enriched tasks as a CLI table with dynamic column widths.
+ * Displays NAME, SCHEDULE, LAST RUN, NEXT RUN, STATUS columns.
+ * @spec FR-004: Enriched table columns — .specs/features/006-task-listing-status/spec.md#fr-004
+ * @param tasks Array of enriched tasks to display
  * @returns Formatted table string, or "No tasks configured." if empty
  */
-export function formatTaskTable(tasks: Task[]): string {
+export function formatTaskTable(tasks: EnrichedTask[]): string {
 	if (tasks.length === 0) {
 		return "No tasks configured.";
 	}
 
-	const headers = ["NAME", "SCHEDULE", "COMMAND", "STATUS"];
-	const rows = tasks.map((t) => [t.name, t.schedule, t.command, t.status]);
+	const headers = ["NAME", "SCHEDULE", "LAST RUN", "NEXT RUN", "STATUS"];
+	const rows = tasks.map((t) => [
+		t.name,
+		t.schedule,
+		t.lastRun ? formatTimestamp(t.lastRun) : "\u2014",
+		formatTimestamp(t.nextRun),
+		t.status,
+	]);
 
 	const colWidths = headers.map((h, i) =>
 		Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length))
@@ -40,11 +48,13 @@ export function formatTaskTable(tasks: Task[]): string {
 }
 
 /**
- * Format a single task with all details for the `get` command.
- * @param task The task to display
+ * Format a single enriched task with all details for the `get` command.
+ * Includes Last run, Exit code (red if non-zero), and Next run fields.
+ * @spec FR-005: Enriched details, FR-011: Red exit codes — .specs/features/006-task-listing-status/spec.md#fr-005
+ * @param task The enriched task to display
  * @returns Multi-line formatted task details
  */
-export function formatTaskDetails(task: Task): string {
+export function formatTaskDetails(task: EnrichedTask): string {
 	const lines = [
 		`Name:       ${task.name}`,
 		`ID:         ${task.id}`,
@@ -56,6 +66,18 @@ export function formatTaskDetails(task: Task): string {
 	if (task.updatedAt) {
 		lines.push(`Updated:    ${task.updatedAt}`);
 	}
+	if (task.lastRun) {
+		lines.push(`Last run:   ${formatTimestamp(task.lastRun)}`);
+		if (task.lastExitCode !== null) {
+			const exitCodeStr = task.lastExitCode === 0
+				? `${ANSI_GREEN}${task.lastExitCode}${ANSI_RESET}`
+				: `${ANSI_RED}${task.lastExitCode}${ANSI_RESET}`;
+			lines.push(`Exit code:  ${exitCodeStr}`);
+		}
+	} else {
+		lines.push(`Last run:   \u2014`);
+	}
+	lines.push(`Next run:   ${formatTimestamp(task.nextRun)}`);
 	return lines.join("\n");
 }
 
@@ -125,6 +147,21 @@ export function formatSyncResult(result: SyncResult, isClear: boolean): string {
 	return formatSuccess(
 		`Synced ${result.total} ${result.total === 1 ? "task" : "tasks"} to crontab (${result.installed} installed, ${result.updated} updated, ${result.removed} removed)`
 	);
+}
+
+/**
+ * Format an ISO timestamp to a compact local display format (YYYY-MM-DD HH:MM).
+ * @param iso ISO 8601 timestamp string
+ * @returns Formatted local time string
+ */
+function formatTimestamp(iso: string): string {
+	const date = new Date(iso);
+	const y = date.getFullYear();
+	const m = String(date.getMonth() + 1).padStart(2, "0");
+	const d = String(date.getDate()).padStart(2, "0");
+	const h = String(date.getHours()).padStart(2, "0");
+	const min = String(date.getMinutes()).padStart(2, "0");
+	return `${y}-${m}-${d} ${h}:${min}`;
 }
 
 /**
