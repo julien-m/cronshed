@@ -199,6 +199,79 @@ describe("SyncService.sync", () => {
 	});
 });
 
+// @spec FR-059: Sync skips paused tasks — .specs/features/009-task-pause-resume/spec.md#fr-059
+describe("SyncService.sync — paused task filtering", () => {
+	test("AC-010: paused task is not installed in crontab", async () => {
+		const active = buildTask({ name: "active-task" });
+		const paused = buildTask({ name: "paused-task", status: "paused" });
+		const repo = mockRepo([active, paused]);
+		const adapter = mockAdapter({ userLines: [], entries: [] });
+		const service = new SyncService(repo, adapter);
+
+		const result = await service.sync();
+
+		expect(result.installed).toBe(1);
+		expect(result.total).toBe(1);
+		expect(adapter.written!.entries).toHaveLength(1);
+		expect(adapter.written!.entries[0]!.taskName).toBe("active-task");
+	});
+
+	test("AC-010: only active tasks are installed in crontab", async () => {
+		const task1 = buildTask({ name: "task-a" });
+		const task2 = buildTask({ name: "task-b", status: "paused" });
+		const task3 = buildTask({ name: "task-c" });
+		const repo = mockRepo([task1, task2, task3]);
+		const adapter = mockAdapter({ userLines: [], entries: [] });
+		const service = new SyncService(repo, adapter);
+
+		const result = await service.sync();
+
+		expect(result.installed).toBe(2);
+		expect(result.total).toBe(2);
+		expect(adapter.written!.entries.map((e: CrontabEntry) => e.taskName)).toEqual(["task-a", "task-c"]);
+	});
+
+	test("AC-011: dry-run does not show paused tasks", async () => {
+		const paused = buildTask({ name: "paused-only", status: "paused" });
+		const repo = mockRepo([paused]);
+		const adapter = mockAdapter({ userLines: [], entries: [] });
+		const service = new SyncService(repo, adapter);
+
+		const result = await service.sync({ dryRun: true });
+
+		expect(result.isUpToDate).toBe(true);
+		expect(result.diff).toHaveLength(0);
+	});
+
+	test("AC-010: paused task with existing crontab entry gets removed", async () => {
+		const paused = buildTask({ name: "was-active", status: "paused" });
+		const repo = mockRepo([paused]);
+		const adapter = mockAdapter({
+			userLines: [],
+			entries: [{ taskName: "was-active", schedule: "0 2 * * *", command: "/usr/local/bin/test.sh" }],
+		});
+		const service = new SyncService(repo, adapter);
+
+		const result = await service.sync();
+
+		expect(result.removed).toBe(1);
+		expect(adapter.written!.entries).toHaveLength(0);
+	});
+
+	test("all paused tasks are excluded from sync", async () => {
+		const paused1 = buildTask({ name: "paused-a", status: "paused" });
+		const paused2 = buildTask({ name: "paused-b", status: "paused" });
+		const repo = mockRepo([paused1, paused2]);
+		const adapter = mockAdapter({ userLines: [], entries: [] });
+		const service = new SyncService(repo, adapter);
+
+		const result = await service.sync();
+
+		expect(result.isUpToDate).toBe(true);
+		expect(result.total).toBe(0);
+	});
+});
+
 describe("SyncService.sync --clear", () => {
 	test("AC-037: removes all cronshed entries", async () => {
 		const repo = mockRepo([]);

@@ -4,6 +4,22 @@
 
 ---
 
+## 2026-03-30 — Feature: Task Pause/Resume implemented
+
+- **Type:** Feature Implemented
+- **Feature:** [009-task-pause-resume](features/009-task-pause-resume/implementation.md) — 281 tests total (all pass), 13 AC, 8 FR
+- **Author:** tool (spec.feature --auto)
+
+---
+
+## 2026-03-30 — Feature: Failure Notifications implemented
+
+- **Type:** Feature Implemented
+- **Feature:** [008-failure-notifications](features/008-failure-notifications/implementation.md) — 244 tests total (all pass), 12 AC, 9 FR
+- **Author:** tool (spec.feature --auto)
+
+---
+
 ## 2026-03-30 — Feature: Execution History implemented
 
 - **Type:** Feature Implemented

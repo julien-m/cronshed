@@ -1,6 +1,7 @@
 // @spec FR-022: Sync algorithm, FR-024: Dry-run, FR-025: Clear — .specs/features/003-crontab-sync/spec.md#fr-022
 
 import type { Task } from "../task/task.types";
+import { TASK_STATUS } from "../task/task.types";
 import type { TaskRepository } from "../task/task.repository";
 import type { CrontabEntry } from "./crontab.types";
 import type { CrontabAdapter } from "./crontab.adapter";
@@ -96,7 +97,8 @@ export class SyncService {
 		}
 
 		const manifest = await this.repo.load();
-		const tasks = manifest.tasks;
+		// @spec FR-059: Filter paused tasks before sync — .specs/features/009-task-pause-resume/spec.md#fr-059
+		const tasks = manifest.tasks.filter((t) => t.status === TASK_STATUS.ACTIVE);
 
 		// @spec FR-044: Regenerate wrappers before sync (skip on dry-run) — .specs/features/005-wrapper-script-generation/spec.md#fr-044
 		if (this.wrapperService && !options.dryRun) {
