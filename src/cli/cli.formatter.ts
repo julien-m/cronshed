@@ -26,18 +26,20 @@ const ANSI_RESET = SUPPORTS_COLOR ? "\x1b[0m" : "";
  * @param tasks Array of enriched tasks to display
  * @returns Formatted table string, or "No tasks configured." if empty
  */
+// @spec FR-014: Tags column in task table — .specs/features/013-task-groups-tags/spec.md#fr-014
 export function formatTaskTable(tasks: EnrichedTask[]): string {
 	if (tasks.length === 0) {
 		return "No tasks configured.";
 	}
 
-	const headers = ["NAME", "SCHEDULE", "LAST RUN", "NEXT RUN", "STATUS"];
+	const headers = ["NAME", "SCHEDULE", "LAST RUN", "NEXT RUN", "STATUS", "TAGS"];
 	const rows = tasks.map((t) => [
 		t.name,
 		t.schedule,
 		t.lastRun ? formatTimestamp(t.lastRun) : "\u2014",
 		formatTimestamp(t.nextRun),
 		t.status,
+		t.tags.length > 0 ? t.tags.join(", ") : "\u2014",
 	]);
 
 	const colWidths = headers.map((h, i) =>
@@ -62,6 +64,7 @@ export function formatTaskTable(tasks: EnrichedTask[]): string {
  */
 export function formatTaskDetails(task: EnrichedTask): string {
 	// @spec FR-054: Display notify status — .specs/features/008-failure-notifications/spec.md#fr-054
+	// @spec FR-013: Display tags in task details — .specs/features/013-task-groups-tags/spec.md#fr-013
 	const lines = [
 		`Name:       ${task.name}`,
 		`ID:         ${task.id}`,
@@ -69,6 +72,7 @@ export function formatTaskDetails(task: EnrichedTask): string {
 		`Command:    ${task.command}`,
 		`Status:     ${task.status}`,
 		`Notify:     ${task.notify ? "on" : "off"}`,
+		`Tags:       ${task.tags.length > 0 ? task.tags.join(", ") : "\u2014"}`,
 		`Created:    ${task.createdAt}`,
 	];
 	if (task.updatedAt) {
@@ -457,4 +461,30 @@ export function formatRotationSummary(results: RotationResult[], dryRun: boolean
 	}
 
 	return lines.join("\n");
+}
+
+// @spec FR-012: Tags table formatting — .specs/features/013-task-groups-tags/spec.md#fr-012
+
+/**
+ * Format a table of tags with their task counts.
+ * Sorted alphabetically by tag name.
+ * @param tagCounts Map of tag name to task count
+ * @returns Formatted table string
+ */
+export function formatTagsTable(tagCounts: Map<string, number>): string {
+	const headers = ["TAG", "TASKS"];
+	const sorted = [...tagCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+	const rows = sorted.map(([tag, count]) => [tag, String(count)]);
+
+	const colWidths = headers.map((h, i) =>
+		Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length))
+	);
+
+	const pad = (str: string, width: number) => str.padEnd(width);
+	const headerLine = headers.map((h, i) => pad(h, colWidths[i]!)).join("  ");
+	const dataLines = rows.map((row) =>
+		row.map((cell, i) => pad(cell ?? "", colWidths[i]!)).join("  ")
+	);
+
+	return [headerLine, ...dataLines].join("\n");
 }

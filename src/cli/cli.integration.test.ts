@@ -712,3 +712,210 @@ describe("cronshed doctor", () => {
 		expect(stdout).toContain("doctor");
 	});
 });
+
+// --- Task Groups/Tags (Feature 013) ---
+
+// @spec FR-009: CLI tag flags on add — .specs/features/013-task-groups-tags/spec.md#fr-009
+describe("cronshed add --tag", () => {
+	test("AC-002: creates task with tags", async () => {
+		const { stdout, exitCode } = await run("add", "tagged-task", "--schedule", "0 0 * * *", "--command", "echo hi", "--tag", "backup", "--tag", "db", "--no-sync");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("Task tagged-task created");
+
+		const { stdout: details } = await run("get", "tagged-task", "--json");
+		const task = JSON.parse(details);
+		expect(task.tags).toEqual(["backup", "db"]);
+	});
+
+	test("AC-001: creates task with empty tags when none provided", async () => {
+		const { exitCode } = await run("add", "no-tags", "--schedule", "0 0 * * *", "--command", "echo hi", "--no-sync");
+		expect(exitCode).toBe(0);
+
+		const { stdout: details } = await run("get", "no-tags", "--json");
+		const task = JSON.parse(details);
+		expect(task.tags).toEqual([]);
+	});
+
+	test("AC-004: rejects invalid tag with exit code 2", async () => {
+		const { stderr, exitCode } = await run("add", "bad-tag", "--schedule", "0 0 * * *", "--command", "echo hi", "--tag", "BAD TAG", "--no-sync");
+		expect(exitCode).toBe(2);
+		expect(stderr).toContain("Invalid tag");
+	});
+
+	test("AC-007: deduplicates tags on creation", async () => {
+		const { exitCode } = await run("add", "dup-tags", "--schedule", "0 0 * * *", "--command", "echo hi", "--tag", "backup", "--tag", "backup", "--no-sync");
+		expect(exitCode).toBe(0);
+
+		const { stdout: details } = await run("get", "dup-tags", "--json");
+		const task = JSON.parse(details);
+		expect(task.tags).toEqual(["backup"]);
+	});
+});
+
+// @spec FR-010: CLI tag/untag flags on update — .specs/features/013-task-groups-tags/spec.md#fr-010
+describe("cronshed update --tag/--untag", () => {
+	test("AC-005: adds a tag to existing task", async () => {
+		await run("add", "my-task", "--schedule", "0 0 * * *", "--command", "echo hi", "--no-sync");
+		const { stdout, exitCode } = await run("update", "my-task", "--tag", "backup", "--no-sync");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("Task my-task updated");
+
+		const { stdout: details } = await run("get", "my-task", "--json");
+		const task = JSON.parse(details);
+		expect(task.tags).toEqual(["backup"]);
+	});
+
+	test("AC-005: removes a tag from existing task", async () => {
+		await run("add", "my-task", "--schedule", "0 0 * * *", "--command", "echo hi", "--tag", "backup", "--tag", "db", "--no-sync");
+		const { exitCode } = await run("update", "my-task", "--untag", "db", "--no-sync");
+		expect(exitCode).toBe(0);
+
+		const { stdout: details } = await run("get", "my-task", "--json");
+		const task = JSON.parse(details);
+		expect(task.tags).toEqual(["backup"]);
+	});
+
+	test("AC-006: removing nonexistent tag is a no-op", async () => {
+		await run("add", "my-task", "--schedule", "0 0 * * *", "--command", "echo hi", "--tag", "backup", "--no-sync");
+		const { exitCode } = await run("update", "my-task", "--untag", "nonexistent", "--no-sync");
+		expect(exitCode).toBe(0);
+
+		const { stdout: details } = await run("get", "my-task", "--json");
+		const task = JSON.parse(details);
+		expect(task.tags).toEqual(["backup"]);
+	});
+
+	test("AC-013: tag-only update is a valid change", async () => {
+		await run("add", "my-task", "--schedule", "0 0 * * *", "--command", "echo hi", "--no-sync");
+		const { exitCode } = await run("update", "my-task", "--tag", "backup", "--no-sync");
+		expect(exitCode).toBe(0);
+	});
+
+	test("AC-004: rejects invalid tag on update", async () => {
+		await run("add", "my-task", "--schedule", "0 0 * * *", "--command", "echo hi", "--no-sync");
+		const { stderr, exitCode } = await run("update", "my-task", "--tag", "BAD TAG", "--no-sync");
+		expect(exitCode).toBe(2);
+		expect(stderr).toContain("Invalid tag");
+	});
+});
+
+// @spec FR-011: List filter by tag — .specs/features/013-task-groups-tags/spec.md#fr-011
+describe("cronshed list --tag", () => {
+	test("AC-008: filters tasks by tag", async () => {
+		await run("add", "db-backup", "--schedule", "0 0 * * *", "--command", "echo a", "--tag", "backup", "--tag", "db", "--no-sync");
+		await run("add", "log-clean", "--schedule", "0 1 * * *", "--command", "echo b", "--tag", "cleanup", "--no-sync");
+		await run("add", "db-migrate", "--schedule", "0 2 * * *", "--command", "echo c", "--tag", "db", "--no-sync");
+
+		const { stdout, exitCode } = await run("list", "--tag", "db");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("db-backup");
+		expect(stdout).toContain("db-migrate");
+		expect(stdout).not.toContain("log-clean");
+	});
+
+	test("AC-009: no matches shows message", async () => {
+		await run("add", "my-task", "--schedule", "0 0 * * *", "--command", "echo hi", "--tag", "backup", "--no-sync");
+		const { stdout, exitCode } = await run("list", "--tag", "nonexistent");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("No tasks found with tag");
+	});
+
+	test("AC-008: --tag with --json filters results", async () => {
+		await run("add", "db-backup", "--schedule", "0 0 * * *", "--command", "echo a", "--tag", "backup", "--no-sync");
+		await run("add", "log-clean", "--schedule", "0 1 * * *", "--command", "echo b", "--tag", "cleanup", "--no-sync");
+
+		const { stdout, exitCode } = await run("list", "--tag", "backup", "--json");
+		expect(exitCode).toBe(0);
+		const parsed = JSON.parse(stdout);
+		expect(parsed).toHaveLength(1);
+		expect(parsed[0].name).toBe("db-backup");
+	});
+});
+
+// @spec FR-012: Tags subcommand — .specs/features/013-task-groups-tags/spec.md#fr-012
+describe("cronshed tags", () => {
+	test("AC-010: displays tags with task counts", async () => {
+		await run("add", "task-a", "--schedule", "0 0 * * *", "--command", "echo a", "--tag", "backup", "--tag", "db", "--no-sync");
+		await run("add", "task-b", "--schedule", "0 1 * * *", "--command", "echo b", "--tag", "backup", "--no-sync");
+		await run("add", "task-c", "--schedule", "0 2 * * *", "--command", "echo c", "--tag", "cleanup", "--no-sync");
+
+		const { stdout, exitCode } = await run("tags");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("TAG");
+		expect(stdout).toContain("TASKS");
+		expect(stdout).toContain("backup");
+		expect(stdout).toContain("cleanup");
+		expect(stdout).toContain("db");
+	});
+
+	test("AC-010: no tags shows message", async () => {
+		await run("add", "task-a", "--schedule", "0 0 * * *", "--command", "echo a", "--no-sync");
+		const { stdout, exitCode } = await run("tags");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("No tags in use");
+	});
+
+	test("AC-011: --json outputs tag counts", async () => {
+		await run("add", "task-a", "--schedule", "0 0 * * *", "--command", "echo a", "--tag", "backup", "--no-sync");
+		await run("add", "task-b", "--schedule", "0 1 * * *", "--command", "echo b", "--tag", "backup", "--tag", "db", "--no-sync");
+
+		const { stdout, exitCode } = await run("tags", "--json");
+		expect(exitCode).toBe(0);
+		const parsed = JSON.parse(stdout);
+		expect(parsed.backup).toBe(2);
+		expect(parsed.db).toBe(1);
+	});
+
+	test("tags command appears in help", async () => {
+		const { stdout } = await run("--help");
+		expect(stdout).toContain("tags");
+	});
+});
+
+// @spec FR-013: Tags in get output — .specs/features/013-task-groups-tags/spec.md#fr-013
+describe("cronshed get with tags", () => {
+	test("AC-012: get shows tags for tagged task", async () => {
+		await run("add", "my-task", "--schedule", "0 0 * * *", "--command", "echo hi", "--tag", "backup", "--tag", "db", "--no-sync");
+		const { stdout, exitCode } = await run("get", "my-task");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("Tags:");
+		expect(stdout).toContain("backup, db");
+	});
+
+	test("AC-012: get shows dash for task with no tags", async () => {
+		await run("add", "my-task", "--schedule", "0 0 * * *", "--command", "echo hi", "--no-sync");
+		const { stdout } = await run("get", "my-task");
+		expect(stdout).toContain("Tags:");
+	});
+
+	test("AC-012: get --json includes tags array", async () => {
+		await run("add", "my-task", "--schedule", "0 0 * * *", "--command", "echo hi", "--tag", "backup", "--no-sync");
+		const { stdout } = await run("get", "my-task", "--json");
+		const task = JSON.parse(stdout);
+		expect(task.tags).toEqual(["backup"]);
+	});
+});
+
+// @spec FR-006: Backward compat — .specs/features/013-task-groups-tags/spec.md#fr-006
+describe("backward compatibility — tags", () => {
+	test("AC-014: loads old manifest without tags field", async () => {
+		const manifest = {
+			version: 1,
+			tasks: [{
+				id: "old-id",
+				name: "legacy-task",
+				schedule: "0 0 * * *",
+				command: "echo legacy",
+				status: "active",
+				notify: false,
+				createdAt: "2026-01-01T00:00:00.000Z",
+			}],
+		};
+		await Bun.write(join(tmpDir, "tasks.json"), JSON.stringify(manifest));
+
+		const { stdout, exitCode } = await run("get", "legacy-task", "--json");
+		expect(exitCode).toBe(0);
+		const task = JSON.parse(stdout);
+		expect(task.tags).toEqual([]);
+	});
+});

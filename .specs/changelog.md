@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-03-30 — Feature: Task Groups/Tags implemented
+
+- **Type:** Feature Implemented
+- **Feature:** [013-task-groups-tags](features/013-task-groups-tags/implementation.md) — 433 tests total (all pass), 14 AC, 15 FR
+- **Files changed:** task.types.ts, task.errors.ts, task.service.ts, task.repository.ts, cli.handler.ts, cli.formatter.ts + 6 test files
+
+---
+
 ## 2026-03-30 — Feature: Log Rotation implemented
 
 - **Type:** Feature Implemented

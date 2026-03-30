@@ -67,6 +67,14 @@ export class TaskAlreadyActiveError extends Error {
 	}
 }
 
+// @spec FR-008: InvalidTagError — .specs/features/013-task-groups-tags/spec.md#fr-008
+export class InvalidTagError extends Error {
+	constructor(tag: string) {
+		super(`Invalid tag "${tag}". Use lowercase letters, numbers, and hyphens only.`);
+		this.name = "InvalidTagError";
+	}
+}
+
 export class ManifestAccessError extends Error {
 	constructor(path: string, cause?: Error) {
 		super(`Cannot access ${path}`);

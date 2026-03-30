@@ -18,6 +18,7 @@ import {
 	ManifestAccessError,
 	TaskAlreadyPausedError,
 	TaskAlreadyActiveError,
+	InvalidTagError,
 } from "../task/task.errors";
 import { resolveCommand } from "./command.resolver";
 import {
@@ -32,7 +33,7 @@ import { getNextExecution } from "../cron/cron.service";
 import { getLastExecution } from "../log/log.service";
 import type { Task, EnrichedTask } from "../task/task.types";
 import { TASK_STATUS } from "../task/task.types";
-import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff, formatDiagnosisReport, formatImportPreview, formatImportSummary, formatSkippedWarning, formatRotationSummary } from "./cli.formatter";
+import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff, formatDiagnosisReport, formatImportPreview, formatImportSummary, formatSkippedWarning, formatRotationSummary, formatTagsTable } from "./cli.formatter";
 import { importCrontabEntries } from "../import/import.service";
 import { getExecutionHistory } from "../log/log.service";
 import { DiagnosisService } from "../diagnosis/diagnosis.service";
@@ -90,6 +91,7 @@ function getExitCode(err: unknown): number {
 		err instanceof InvalidCronExpressionError ||
 		err instanceof InvalidTaskNameError ||
 		err instanceof EmptyCommandError ||
+		err instanceof InvalidTagError ||
 		err instanceof CommandFileNotFoundError ||
 		err instanceof CommandFileNotExecutableError ||
 		err instanceof CommandPathIsDirectoryError
@@ -118,6 +120,9 @@ function getExitCode(err: unknown): number {
 function getErrorHint(err: unknown): string | undefined {
 	if (err instanceof InvalidCronExpressionError) {
 		return "Expected format: '* * * * *' (minute hour day month weekday)";
+	}
+	if (err instanceof InvalidTagError) {
+		return "Tags must be lowercase kebab-case (e.g., 'backup', 'db-sync')";
 	}
 	if (err instanceof ManifestCorruptedError) {
 		return `Inspect manually: ${err.path}`;
@@ -154,12 +159,14 @@ async function handleAdd(args: string[], service: TaskService, repo: TaskReposit
 		process.exit(2);
 	}
 
+	// @spec FR-009: Parse --tag flags on add — .specs/features/013-task-groups-tags/spec.md#fr-009
 	const { values } = parseArgs({
 		args: args.slice(1),
 		options: {
 			schedule: { type: "string", short: "s" },
 			command: { type: "string", short: "c" },
 			notify: { type: "boolean", default: false },
+			tag: { type: "string", multiple: true },
 			"no-sync": { type: "boolean", default: false },
 		},
 		allowPositionals: false,
@@ -183,6 +190,7 @@ async function handleAdd(args: string[], service: TaskService, repo: TaskReposit
 		schedule: values.schedule,
 		command: resolution.resolved,
 		notify: values.notify ?? false,
+		tags: values.tag,
 	});
 
 	// @spec FR-042: Generate wrapper on add — .specs/features/005-wrapper-script-generation/spec.md#fr-042
@@ -201,16 +209,32 @@ async function handleAdd(args: string[], service: TaskService, repo: TaskReposit
 }
 
 // @spec FR-007: Enrich tasks in list, FR-009: JSON output with enriched data — .specs/features/006-task-listing-status/spec.md#fr-007
+// @spec FR-011: List filter by tag — .specs/features/013-task-groups-tags/spec.md#fr-011
 async function handleList(args: string[], service: TaskService): Promise<void> {
 	const { values } = parseArgs({
 		args,
 		options: {
 			json: { type: "boolean", default: false },
+			tag: { type: "string" },
 		},
 		allowPositionals: false,
 	});
 
-	const tasks = await service.list();
+	let tasks = await service.list();
+
+	// @spec FR-011: Filter tasks by tag — .specs/features/013-task-groups-tags/spec.md#fr-011
+	const filterTag = values.tag;
+	if (filterTag) {
+		tasks = tasks.filter((t) => t.tags.includes(filterTag));
+		if (tasks.length === 0) {
+			if (values.json) {
+				console.log(JSON.stringify([], null, "\t"));
+			} else {
+				console.log(`No tasks found with tag "${filterTag}"`);
+			}
+			return;
+		}
+	}
 
 	if (tasks.length === 0) {
 		if (values.json) {
@@ -268,6 +292,7 @@ async function handleUpdate(args: string[], service: TaskService, repo: TaskRepo
 	}
 
 	// @spec FR-052: Accept --notify and --no-notify flags — .specs/features/008-failure-notifications/spec.md#fr-052
+	// @spec FR-010: Parse --tag and --untag flags on update — .specs/features/013-task-groups-tags/spec.md#fr-010
 	const { values } = parseArgs({
 		args: args.slice(1),
 		options: {
@@ -275,6 +300,8 @@ async function handleUpdate(args: string[], service: TaskService, repo: TaskRepo
 			command: { type: "string", short: "c" },
 			notify: { type: "boolean" },
 			"no-notify": { type: "boolean" },
+			tag: { type: "string", multiple: true },
+			untag: { type: "string", multiple: true },
 			"no-sync": { type: "boolean", default: false },
 		},
 		allowPositionals: false,
@@ -294,6 +321,8 @@ async function handleUpdate(args: string[], service: TaskService, repo: TaskRepo
 		schedule: values.schedule,
 		command: resolvedCommand,
 		notify: notifyValue,
+		tags: values.tag,
+		untags: values.untag,
 	});
 
 	// @spec FR-042: Regenerate wrapper on command or notify change — .specs/features/005-wrapper-script-generation/spec.md#fr-042
@@ -652,10 +681,51 @@ async function handleRotate(args: string[]): Promise<void> {
 	console.log(formatRotationSummary(results, options.dryRun));
 }
 
+// @spec FR-012: Tags subcommand — .specs/features/013-task-groups-tags/spec.md#fr-012
+async function handleTags(args: string[], service: TaskService): Promise<void> {
+	const { values } = parseArgs({
+		args,
+		options: {
+			json: { type: "boolean", default: false },
+		},
+		allowPositionals: false,
+	});
+
+	const tasks = await service.list();
+	const tagCounts = new Map<string, number>();
+
+	for (const task of tasks) {
+		for (const tag of task.tags) {
+			tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+		}
+	}
+
+	if (tagCounts.size === 0) {
+		if (values.json) {
+			console.log(JSON.stringify({}, null, "\t"));
+		} else {
+			console.log("No tags in use");
+		}
+		return;
+	}
+
+	if (values.json) {
+		const obj: Record<string, number> = {};
+		for (const [tag, count] of [...tagCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+			obj[tag] = count;
+		}
+		console.log(JSON.stringify(obj, null, "\t"));
+		return;
+	}
+
+	console.log(formatTagsTable(tagCounts));
+}
+
 const QUERY_SUBCOMMANDS: Record<string, (args: string[], service: TaskService) => Promise<void>> = {
 	list: handleList,
 	get: handleGet,
 	history: handleHistory,
+	tags: handleTags,
 };
 
 const MUTATION_SUBCOMMANDS: Record<string, (args: string[], service: TaskService, repo: TaskRepository) => Promise<void>> = {
@@ -687,18 +757,20 @@ export async function runCli(argv: string[]): Promise<void> {
 		console.log("Usage: cronshed <command> [options]");
 		console.log("");
 		console.log("Commands:");
-		console.log("  add <name> --schedule '<cron>' --command '<cmd>' [--notify] [--no-sync]   Add a task");
-		console.log("  list [--json]                                                  List all tasks");
+		// @spec FR-015: Help text with tag flags — .specs/features/013-task-groups-tags/spec.md#fr-015
+		console.log("  add <name> --schedule '<cron>' --command '<cmd>' [--notify] [--tag <tag>]... [--no-sync]   Add a task");
+		console.log("  list [--tag <tag>] [--json]                                   List all tasks (optionally filter by tag)");
 		console.log("  get <name> [--json]                                            Show task details");
-		console.log("  update <name> [--schedule '<cron>'] [--command '<cmd>'] [--notify|--no-notify] [--no-sync]  Update a task");
+		console.log("  update <name> [--schedule '<cron>'] [--command '<cmd>'] [--notify|--no-notify] [--tag <tag>]... [--untag <tag>]... [--no-sync]  Update a task");
 		console.log("  remove <name> [--no-sync]                                     Remove a task");
 		console.log("  pause <name> [--no-sync]                                      Pause a task (remove from crontab)");
 		console.log("  resume <name> [--no-sync]                                     Resume a paused task");
 		console.log("  history <name> [--limit N] [--json]                            Show execution history");
+		console.log("  tags [--json]                                                  List all tags with task counts");
 		console.log("  sync [--dry-run] [--clear]                                    Sync tasks to crontab");
 		console.log("  doctor [name] [--json]                                         Diagnose task issues");
 		console.log("  import [--dry-run] [--prefix <name>]                              Import crontab entries");
-	console.log("  rotate [name] [--max-age <days>] [--max-entries <N>] [--dry-run] [--json]  Rotate execution logs");
+		console.log("  rotate [name] [--max-age <days>] [--max-entries <N>] [--dry-run] [--json]  Rotate execution logs");
 		return;
 	}
 

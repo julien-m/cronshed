@@ -60,6 +60,7 @@ async function createTask(overrides: Partial<Task> & { name: string }): Promise<
 		command: "echo hello",
 		status: "active",
 		notify: false,
+		tags: [],
 		createdAt: new Date().toISOString(),
 	};
 	const task = { ...defaults, ...overrides };

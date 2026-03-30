@@ -2,7 +2,7 @@
 
 import { validateCronExpression } from "../cron/cron.service";
 import type { Task, CreateTaskInput, UpdateTaskInput } from "./task.types";
-import { TASK_NAME_REGEX, TASK_STATUS } from "./task.types";
+import { TASK_NAME_REGEX, TASK_STATUS, TAG_REGEX, normalizeTags } from "./task.types";
 import { TaskRepository } from "./task.repository";
 import {
 	TaskNotFoundError,
@@ -12,6 +12,7 @@ import {
 	NoChangesSpecifiedError,
 	TaskAlreadyPausedError,
 	TaskAlreadyActiveError,
+	InvalidTagError,
 } from "./task.errors";
 
 export class TaskService {
@@ -19,12 +20,13 @@ export class TaskService {
 
 	/**
 	 * Add a new task to the manifest.
-	 * @param input Task creation input with name, command, and schedule
+	 * @param input Task creation input with name, command, schedule, and optional tags
 	 * @returns The created task with generated id and metadata
 	 * @throws InvalidTaskNameError if name is not valid kebab-case
 	 * @throws EmptyCommandError if command is empty or whitespace
 	 * @throws InvalidCronExpressionError if schedule is invalid
 	 * @throws DuplicateTaskNameError if a task with the same name exists
+	 * @throws InvalidTagError if any tag is not valid kebab-case
 	 */
 	async add(input: CreateTaskInput): Promise<Task> {
 		if (!TASK_NAME_REGEX.test(input.name)) {
@@ -34,6 +36,14 @@ export class TaskService {
 			throw new EmptyCommandError();
 		}
 		validateCronExpression(input.schedule);
+
+		// @spec FR-004: Validate tags on add — .specs/features/013-task-groups-tags/spec.md#fr-004
+		const tags = input.tags ?? [];
+		for (const tag of tags) {
+			if (!TAG_REGEX.test(tag)) {
+				throw new InvalidTagError(tag);
+			}
+		}
 
 		const manifest = await this.repo.load();
 
@@ -49,6 +59,7 @@ export class TaskService {
 			command: input.command,
 			status: "active",
 			notify: input.notify ?? false,
+			tags: normalizeTags(tags),
 			createdAt: new Date().toISOString(),
 		};
 
@@ -85,19 +96,23 @@ export class TaskService {
 	/**
 	 * Update one or more properties of an existing task.
 	 * @param name The task name to update
-	 * @param input Optional updates for schedule and/or command
+	 * @param input Optional updates for schedule, command, notify, tags, untags
 	 * @returns The updated task
 	 * @throws TaskNotFoundError if no task with this name exists
 	 * @throws NoChangesSpecifiedError if no fields are provided
 	 * @throws EmptyCommandError if command is updated to empty/whitespace
 	 * @throws InvalidCronExpressionError if schedule is invalid
+	 * @throws InvalidTagError if any tag is not valid kebab-case
 	 */
 	async update(name: string, input: UpdateTaskInput): Promise<Task> {
 		const hasSchedule = input.schedule !== undefined;
 		const hasCommand = input.command !== undefined;
 		const hasNotify = input.notify !== undefined;
+		// @spec FR-005: Tag/untag on update — .specs/features/013-task-groups-tags/spec.md#fr-005
+		const hasTags = input.tags !== undefined && input.tags.length > 0;
+		const hasUntags = input.untags !== undefined && input.untags.length > 0;
 
-		if (!hasSchedule && !hasCommand && !hasNotify) {
+		if (!hasSchedule && !hasCommand && !hasNotify && !hasTags && !hasUntags) {
 			throw new NoChangesSpecifiedError();
 		}
 
@@ -107,6 +122,22 @@ export class TaskService {
 
 		if (hasSchedule) {
 			validateCronExpression(input.schedule!);
+		}
+
+		// Validate tags before any mutation
+		if (hasTags) {
+			for (const tag of input.tags!) {
+				if (!TAG_REGEX.test(tag)) {
+					throw new InvalidTagError(tag);
+				}
+			}
+		}
+		if (hasUntags) {
+			for (const tag of input.untags!) {
+				if (!TAG_REGEX.test(tag)) {
+					throw new InvalidTagError(tag);
+				}
+			}
 		}
 
 		const manifest = await this.repo.load();
@@ -125,6 +156,23 @@ export class TaskService {
 		if (hasNotify) {
 			task.notify = input.notify!;
 		}
+
+		// @spec FR-005: Apply tag additions and removals — .specs/features/013-task-groups-tags/spec.md#fr-005
+		if (hasTags || hasUntags) {
+			let currentTags = new Set(task.tags);
+			if (hasTags) {
+				for (const tag of input.tags!) {
+					currentTags.add(tag);
+				}
+			}
+			if (hasUntags) {
+				for (const tag of input.untags!) {
+					currentTags.delete(tag);
+				}
+			}
+			task.tags = normalizeTags([...currentTags]);
+		}
+
 		task.updatedAt = new Date().toISOString();
 
 		await this.repo.save(manifest);

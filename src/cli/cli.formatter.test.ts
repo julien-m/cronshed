@@ -10,6 +10,7 @@ const sampleTask: Task = {
 	command: "/usr/local/bin/backup.sh",
 	status: "active",
 	notify: false,
+	tags: [],
 	createdAt: "2026-03-30T00:00:00.000Z",
 };
 
