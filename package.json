@@ -5,6 +5,9 @@
 		"@types/bun": "latest",
 		"typescript": "^5"
 	},
+	"bin": {
+		"shed": "index.ts"
+	},
 	"private": true,
 	"scripts": {
 		"typecheck": "bunx tsc --noEmit"
