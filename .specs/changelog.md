@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-03-30 — Feature: Import Existing Crontab implemented
+
+- **Type:** Feature Implemented
+- **Feature:** [011-import-existing-crontab](features/011-import-existing-crontab/implementation.md) — 363 tests total (all pass), 15 AC, 11 FR
+- **Author:** tool (spec.feature --auto)
+
+---
+
 ## 2026-03-30 — Feature: Task Diagnosis implemented
 
 - **Type:** Feature Implemented

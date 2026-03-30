@@ -32,7 +32,8 @@ import { getNextExecution } from "../cron/cron.service";
 import { getLastExecution } from "../log/log.service";
 import type { Task, EnrichedTask } from "../task/task.types";
 import { TASK_STATUS } from "../task/task.types";
-import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff, formatDiagnosisReport } from "./cli.formatter";
+import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff, formatDiagnosisReport, formatImportPreview, formatImportSummary, formatSkippedWarning } from "./cli.formatter";
+import { importCrontabEntries } from "../import/import.service";
 import { getExecutionHistory } from "../log/log.service";
 import { DiagnosisService } from "../diagnosis/diagnosis.service";
 
@@ -526,6 +527,71 @@ async function handleDoctor(args: string[]): Promise<void> {
 	}
 }
 
+// @spec FR-079: Import CLI handler, FR-081: Create tasks, FR-082: Auto-sync after import — .specs/features/011-import-existing-crontab/spec.md#fr-079
+async function handleImport(args: string[]): Promise<void> {
+	const { values } = parseArgs({
+		args,
+		options: {
+			"dry-run": { type: "boolean", default: false },
+			prefix: { type: "string" },
+		},
+		allowPositionals: false,
+	});
+
+	const adapter = new CrontabAdapter();
+	const repo = new TaskRepository();
+	const taskService = new TaskService(repo);
+
+	// Read crontab
+	const crontab = await adapter.read();
+
+	// Get existing task names for conflict resolution
+	const existingTasks = await taskService.list();
+	const existingNames = new Set(existingTasks.map((t) => t.name));
+
+	// Run import logic
+	const result = importCrontabEntries(crontab.userLines, existingNames, {
+		dryRun: values["dry-run"] ?? false,
+		prefix: values.prefix,
+	});
+
+	// Show warnings for skipped entries
+	for (const skipped of result.skipped) {
+		console.error(formatSkippedWarning(skipped));
+	}
+
+	// Handle empty result
+	if (result.imported.length === 0) {
+		console.log("No entries to import");
+		return;
+	}
+
+	// Dry-run: show preview only
+	if (result.dryRun) {
+		console.log(formatImportPreview(result.imported));
+		console.log("");
+		console.log(formatImportSummary(result));
+		return;
+	}
+
+	// Create tasks and generate wrappers
+	const wrapperService = new WrapperService(getDataDir());
+	for (const entry of result.imported) {
+		const task = await taskService.add({
+			name: entry.name,
+			schedule: entry.schedule,
+			command: entry.command,
+		});
+		await wrapperService.generate(task);
+	}
+
+	// Display summary
+	console.log(formatImportSummary(result));
+
+	// Auto-sync
+	await autoSync(repo);
+}
+
 const QUERY_SUBCOMMANDS: Record<string, (args: string[], service: TaskService) => Promise<void>> = {
 	list: handleList,
 	get: handleGet,
@@ -544,6 +610,7 @@ const MUTATION_SUBCOMMANDS: Record<string, (args: string[], service: TaskService
 const STANDALONE_COMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 	sync: handleSync,
 	doctor: handleDoctor,
+	import: handleImport,
 };
 
 /**
@@ -569,6 +636,7 @@ export async function runCli(argv: string[]): Promise<void> {
 		console.log("  history <name> [--limit N] [--json]                            Show execution history");
 		console.log("  sync [--dry-run] [--clear]                                    Sync tasks to crontab");
 		console.log("  doctor [name] [--json]                                         Diagnose task issues");
+		console.log("  import [--dry-run] [--prefix <name>]                              Import crontab entries");
 		return;
 	}
 
