@@ -4,6 +4,15 @@
 import type { Task } from "../task/task.types";
 import type { SyncResult, SyncDiffEntry } from "../crontab/sync.service";
 
+// ANSI color codes for terminal output (convention: signal/noise maximal, colors for semantic meaning)
+// Respects NO_COLOR environment variable per spec: colors disabled only when NO_COLOR is set AND non-empty
+// @see https://no-color.org/
+const SUPPORTS_COLOR = process.env.NO_COLOR === undefined || process.env.NO_COLOR === "";
+const ANSI_GREEN = SUPPORTS_COLOR ? "\x1b[32m" : "";
+const ANSI_RED = SUPPORTS_COLOR ? "\x1b[31m" : "";
+const ANSI_YELLOW = SUPPORTS_COLOR ? "\x1b[33m" : "";
+const ANSI_RESET = SUPPORTS_COLOR ? "\x1b[0m" : "";
+
 /**
  * Format an array of tasks as a CLI table with dynamic column widths.
  * @param tasks Array of tasks to display
@@ -51,25 +60,48 @@ export function formatTaskDetails(task: Task): string {
 }
 
 /**
- * Format a success message prefixed with ✓.
+ * Format a success message prefixed with ✓ in green.
  * @param message The success message to display
- * @returns Formatted success string with checkmark prefix
+ * @returns Formatted success string with green checkmark prefix
  */
 export function formatSuccess(message: string): string {
-	return `\u2713 ${message}`;
+	return `${ANSI_GREEN}\u2713${ANSI_RESET} ${message}`;
 }
 
 /**
- * Format an error message prefixed with ✗, with optional actionable hint.
+ * Format an error message prefixed with ✗ in red, with optional actionable hint.
  * @param message The error message
  * @param hint Optional suggestion line prefixed with →
  */
 export function formatError(message: string, hint?: string): string {
-	let output = `\u2717 Error: ${message}`;
+	let output = `${ANSI_RED}\u2717${ANSI_RESET} Error: ${message}`;
 	if (hint) {
-		output += `\n\u2192 ${hint}`;
+		output += `\n${ANSI_RED}\u2192${ANSI_RESET} ${hint}`;
 	}
 	return output;
+}
+
+/**
+ * Format a warning message prefixed with ⚠ in yellow, with optional actionable hint.
+ * @param message The warning message
+ * @param hint Optional suggestion line prefixed with →
+ */
+// @spec FR-032: Non-fatal auto-sync warning — .specs/features/004-auto-sync/spec.md#fr-032
+export function formatWarning(message: string, hint?: string): string {
+	let output = `${ANSI_YELLOW}\u26A0${ANSI_RESET} Warning: ${message}`;
+	if (hint) {
+		output += `\n${ANSI_YELLOW}\u2192${ANSI_RESET} ${hint}`;
+	}
+	return output;
+}
+
+/**
+ * Format the auto-sync confirmation message.
+ * @returns Formatted sync confirmation string with checkmark prefix
+ */
+// @spec FR-033: Sync confirmation message — .specs/features/004-auto-sync/spec.md#fr-033
+export function formatSyncConfirmation(): string {
+	return formatSuccess("Synced to crontab");
 }
 
 /**

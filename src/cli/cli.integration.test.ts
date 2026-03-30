@@ -31,21 +31,21 @@ async function run(...args: string[]) {
 
 describe("cronshed add", () => {
 	test("AC-001: creates a task successfully", async () => {
-		const { stdout, exitCode } = await run("add", "backup-db", "--schedule", "0 2 * * *", "--command", "echo hi");
+		const { stdout, exitCode } = await run("add", "backup-db", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
 		expect(exitCode).toBe(0);
 		expect(stdout).toContain("Task backup-db created");
 	});
 
 	test("AC-002: rejects invalid cron with exit code 2", async () => {
-		const { stderr, exitCode } = await run("add", "bad-cron", "--schedule", "bad", "--command", "echo hi");
+		const { stderr, exitCode } = await run("add", "bad-cron", "--schedule", "bad", "--command", "echo hi", "--no-sync");
 		expect(exitCode).toBe(2);
 		expect(stderr).toContain('Invalid cron expression "bad"');
 		expect(stderr).toContain("Expected format");
 	});
 
 	test("AC-003: rejects duplicate name with exit code 1", async () => {
-		await run("add", "my-task", "--schedule", "0 0 * * *", "--command", "echo hi");
-		const { stderr, exitCode } = await run("add", "my-task", "--schedule", "0 1 * * *", "--command", "echo dup");
+		await run("add", "my-task", "--schedule", "0 0 * * *", "--command", "echo hi", "--no-sync");
+		const { stderr, exitCode } = await run("add", "my-task", "--schedule", "0 1 * * *", "--command", "echo dup", "--no-sync");
 		expect(exitCode).toBe(1);
 		expect(stderr).toContain('Task "my-task" already exists');
 	});
@@ -60,8 +60,8 @@ describe("cronshed add", () => {
 
 describe("cronshed list", () => {
 	test("AC-005: displays tasks in a table", async () => {
-		await run("add", "task-a", "--schedule", "0 0 * * *", "--command", "echo a");
-		await run("add", "task-b", "--schedule", "0 1 * * *", "--command", "echo b");
+		await run("add", "task-a", "--schedule", "0 0 * * *", "--command", "echo a", "--no-sync");
+		await run("add", "task-b", "--schedule", "0 1 * * *", "--command", "echo b", "--no-sync");
 
 		const { stdout, exitCode } = await run("list");
 		expect(exitCode).toBe(0);
@@ -71,7 +71,7 @@ describe("cronshed list", () => {
 	});
 
 	test("AC-006: outputs JSON array", async () => {
-		await run("add", "task-a", "--schedule", "0 0 * * *", "--command", "echo a");
+		await run("add", "task-a", "--schedule", "0 0 * * *", "--command", "echo a", "--no-sync");
 		const { stdout, exitCode } = await run("list", "--json");
 		expect(exitCode).toBe(0);
 		const parsed = JSON.parse(stdout);
@@ -94,7 +94,7 @@ describe("cronshed list", () => {
 
 describe("cronshed get", () => {
 	test("AC-013: shows task details", async () => {
-		await run("add", "my-task", "--schedule", "0 2 * * *", "--command", "echo hi");
+		await run("add", "my-task", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
 		const { stdout, exitCode } = await run("get", "my-task");
 		expect(exitCode).toBe(0);
 		expect(stdout).toContain("my-task");
@@ -104,7 +104,7 @@ describe("cronshed get", () => {
 	});
 
 	test("AC-014: outputs JSON", async () => {
-		await run("add", "my-task", "--schedule", "0 2 * * *", "--command", "echo hi");
+		await run("add", "my-task", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
 		const { stdout, exitCode } = await run("get", "my-task", "--json");
 		expect(exitCode).toBe(0);
 		const parsed = JSON.parse(stdout);
@@ -126,8 +126,8 @@ describe("cronshed get", () => {
 
 describe("cronshed update", () => {
 	test("AC-010: updates schedule", async () => {
-		await run("add", "my-task", "--schedule", "0 2 * * *", "--command", "echo hi");
-		const { stdout, exitCode } = await run("update", "my-task", "--schedule", "0 3 * * *");
+		await run("add", "my-task", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
+		const { stdout, exitCode } = await run("update", "my-task", "--schedule", "0 3 * * *", "--no-sync");
 		expect(exitCode).toBe(0);
 		expect(stdout).toContain("Task my-task updated");
 
@@ -137,7 +137,7 @@ describe("cronshed update", () => {
 	});
 
 	test("AC-012: rejects no changes with exit code 2", async () => {
-		await run("add", "my-task", "--schedule", "0 2 * * *", "--command", "echo hi");
+		await run("add", "my-task", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
 		const { stderr, exitCode } = await run("update", "my-task");
 		expect(exitCode).toBe(2);
 		expect(stderr).toContain("No changes specified");
@@ -152,8 +152,8 @@ describe("cronshed update", () => {
 
 describe("cronshed remove", () => {
 	test("AC-008: removes a task", async () => {
-		await run("add", "my-task", "--schedule", "0 2 * * *", "--command", "echo hi");
-		const { stdout, exitCode } = await run("remove", "my-task");
+		await run("add", "my-task", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
+		const { stdout, exitCode } = await run("remove", "my-task", "--no-sync");
 		expect(exitCode).toBe(0);
 		expect(stdout).toContain("Task my-task removed");
 
@@ -196,7 +196,7 @@ describe("command path resolution", () => {
 		const { chmod } = await import("node:fs/promises");
 		await chmod(scriptPath, 0o755);
 
-		const { stdout, exitCode } = await run("add", "scripted", "--schedule", "0 0 * * *", "--command", scriptPath);
+		const { stdout, exitCode } = await run("add", "scripted", "--schedule", "0 0 * * *", "--command", scriptPath, "--no-sync");
 		expect(exitCode).toBe(0);
 		expect(stdout).toContain("Task scripted created");
 		expect(stdout).toContain(scriptPath);
@@ -209,7 +209,7 @@ describe("command path resolution", () => {
 
 	test("AC-024: add with non-existent path gives exit code 2", async () => {
 		const missing = join(tmpDir, "nonexistent.sh");
-		const { stderr, exitCode } = await run("add", "broken", "--schedule", "0 0 * * *", "--command", missing);
+		const { stderr, exitCode } = await run("add", "broken", "--schedule", "0 0 * * *", "--command", missing, "--no-sync");
 		expect(exitCode).toBe(2);
 		expect(stderr).toContain("File not found");
 		expect(stderr).toContain("Resolved to:");
@@ -221,14 +221,14 @@ describe("command path resolution", () => {
 		const { chmod } = await import("node:fs/promises");
 		await chmod(scriptPath, 0o644);
 
-		const { stderr, exitCode } = await run("add", "bad-exec", "--schedule", "0 0 * * *", "--command", scriptPath);
+		const { stderr, exitCode } = await run("add", "bad-exec", "--schedule", "0 0 * * *", "--command", scriptPath, "--no-sync");
 		expect(exitCode).toBe(2);
 		expect(stderr).toContain("not executable");
 		expect(stderr).toContain("chmod +x");
 	});
 
 	test("AC-026: add with inline command stores as-is", async () => {
-		const { stdout, exitCode } = await run("add", "inline", "--schedule", "0 0 * * *", "--command", "echo hello world");
+		const { stdout, exitCode } = await run("add", "inline", "--schedule", "0 0 * * *", "--command", "echo hello world", "--no-sync");
 		expect(exitCode).toBe(0);
 		expect(stdout).toContain("Task inline created");
 
@@ -242,20 +242,20 @@ describe("command path resolution", () => {
 		const { mkdir: mkdirFs } = await import("node:fs/promises");
 		await mkdirFs(dir);
 
-		const { stderr, exitCode } = await run("add", "dir-cmd", "--schedule", "0 0 * * *", "--command", dir);
+		const { stderr, exitCode } = await run("add", "dir-cmd", "--schedule", "0 0 * * *", "--command", dir, "--no-sync");
 		expect(exitCode).toBe(2);
 		expect(stderr).toContain("directory");
 	});
 
 	test("AC-029: update --command with relative path resolves", async () => {
-		await run("add", "updatable", "--schedule", "0 0 * * *", "--command", "echo initial");
+		await run("add", "updatable", "--schedule", "0 0 * * *", "--command", "echo initial", "--no-sync");
 
 		const scriptPath = join(tmpDir, "updated-script.sh");
 		await Bun.write(scriptPath, "#!/bin/sh\necho updated");
 		const { chmod } = await import("node:fs/promises");
 		await chmod(scriptPath, 0o755);
 
-		const { stdout, exitCode } = await run("update", "updatable", "--command", scriptPath);
+		const { stdout, exitCode } = await run("update", "updatable", "--command", scriptPath, "--no-sync");
 		expect(exitCode).toBe(0);
 		expect(stdout).toContain("Task updatable updated");
 
@@ -265,21 +265,21 @@ describe("command path resolution", () => {
 	});
 
 	test("AC-025: update --command with non-executable file gives exit code 2", async () => {
-		await run("add", "updatable2", "--schedule", "0 0 * * *", "--command", "echo initial");
+		await run("add", "updatable2", "--schedule", "0 0 * * *", "--command", "echo initial", "--no-sync");
 
 		const scriptPath = join(tmpDir, "no-exec-update.sh");
 		await Bun.write(scriptPath, "#!/bin/sh\necho hi");
 		const { chmod } = await import("node:fs/promises");
 		await chmod(scriptPath, 0o644);
 
-		const { stderr, exitCode } = await run("update", "updatable2", "--command", scriptPath);
+		const { stderr, exitCode } = await run("update", "updatable2", "--command", scriptPath, "--no-sync");
 		expect(exitCode).toBe(2);
 		expect(stderr).toContain("not executable");
 	});
 
 	test("AC-029: update --schedule only does not trigger path resolution", async () => {
-		await run("add", "sched-only", "--schedule", "0 0 * * *", "--command", "echo hi");
-		const { stdout, exitCode } = await run("update", "sched-only", "--schedule", "0 4 * * *");
+		await run("add", "sched-only", "--schedule", "0 0 * * *", "--command", "echo hi", "--no-sync");
+		const { stdout, exitCode } = await run("update", "sched-only", "--schedule", "0 4 * * *", "--no-sync");
 		expect(exitCode).toBe(0);
 		expect(stdout).toContain("Task sched-only updated");
 

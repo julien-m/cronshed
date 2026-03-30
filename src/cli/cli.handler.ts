@@ -23,7 +23,7 @@ import {
 	CommandFileNotExecutableError,
 	CommandPathIsDirectoryError,
 } from "./command.errors";
-import { formatTaskTable, formatTaskDetails, formatSuccess, formatError, formatSyncResult, formatSyncDiff } from "./cli.formatter";
+import { formatTaskTable, formatTaskDetails, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff } from "./cli.formatter";
 
 // @spec FR-022: Sync handler, FR-024: Dry-run display, FR-027: Error handling — .specs/features/003-crontab-sync/spec.md#fr-022
 async function handleSync(args: string[]): Promise<void> {
@@ -51,6 +51,22 @@ async function handleSync(args: string[]): Promise<void> {
 	}
 
 	console.log(formatSyncResult(result, values.clear ?? false));
+}
+
+// @spec FR-029, FR-030, FR-031, FR-032, FR-033: Auto-sync after mutations — .specs/features/004-auto-sync/spec.md#fr-029
+async function autoSync(repo: TaskRepository): Promise<void> {
+	try {
+		const adapter = new CrontabAdapter();
+		const syncService = new SyncService(repo, adapter);
+		await syncService.sync();
+		console.log(formatSyncConfirmation());
+	} catch (error) {
+		// Non-fatal sync errors: manifest mutation succeeded but crontab sync failed
+		// Log the actual error details for debugging without exposing implementation details
+		const errorDetail = error instanceof Error ? error.message : String(error);
+		const hint = `Could not sync to crontab: ${errorDetail}. Run 'cronshed sync' to retry`;
+		console.error(formatWarning("Sync skipped", hint));
+	}
 }
 
 function getExitCode(err: unknown): number {
@@ -107,7 +123,8 @@ function getErrorHint(err: unknown): string | undefined {
 	return undefined;
 }
 
-async function handleAdd(args: string[], service: TaskService): Promise<void> {
+// @spec FR-029, FR-034: Auto-sync on add with --no-sync flag — .specs/features/004-auto-sync/spec.md#fr-029
+async function handleAdd(args: string[], service: TaskService, repo: TaskRepository): Promise<void> {
 	const name = args[0];
 	if (!name) {
 		console.error(formatError("Missing task name", "Usage: cronshed add <name> --schedule '<cron>' --command '<cmd>'"));
@@ -119,6 +136,7 @@ async function handleAdd(args: string[], service: TaskService): Promise<void> {
 		options: {
 			schedule: { type: "string", short: "s" },
 			command: { type: "string", short: "c" },
+			"no-sync": { type: "boolean", default: false },
 		},
 		allowPositionals: false,
 	});
@@ -145,6 +163,10 @@ async function handleAdd(args: string[], service: TaskService): Promise<void> {
 		console.log(formatSuccess(`Task ${task.name} created (command: ${resolution.resolved})`));
 	} else {
 		console.log(formatSuccess(`Task ${task.name} created`));
+	}
+
+	if (!values["no-sync"]) {
+		await autoSync(repo);
 	}
 }
 
@@ -205,7 +227,8 @@ async function handleGet(args: string[], service: TaskService): Promise<void> {
 	console.log(formatTaskDetails(task));
 }
 
-async function handleUpdate(args: string[], service: TaskService): Promise<void> {
+// @spec FR-031, FR-034: Auto-sync on update with --no-sync flag — .specs/features/004-auto-sync/spec.md#fr-031
+async function handleUpdate(args: string[], service: TaskService, repo: TaskRepository): Promise<void> {
 	const name = args[0];
 	if (!name) {
 		console.error(formatError("Missing task name", "Usage: cronshed update <name> --schedule '<cron>' --command '<cmd>'"));
@@ -217,6 +240,7 @@ async function handleUpdate(args: string[], service: TaskService): Promise<void>
 		options: {
 			schedule: { type: "string", short: "s" },
 			command: { type: "string", short: "c" },
+			"no-sync": { type: "boolean", default: false },
 		},
 		allowPositionals: false,
 	});
@@ -233,23 +257,43 @@ async function handleUpdate(args: string[], service: TaskService): Promise<void>
 		command: resolvedCommand,
 	});
 	console.log(formatSuccess(`Task ${task.name} updated`));
+
+	if (!values["no-sync"]) {
+		await autoSync(repo);
+	}
 }
 
-async function handleRemove(args: string[], service: TaskService): Promise<void> {
+// @spec FR-030, FR-034: Auto-sync on remove with --no-sync flag — .specs/features/004-auto-sync/spec.md#fr-030
+async function handleRemove(args: string[], service: TaskService, repo: TaskRepository): Promise<void> {
 	const name = args[0];
 	if (!name) {
 		console.error(formatError("Missing task name", "Usage: cronshed remove <name>"));
 		process.exit(2);
 	}
 
+	const { values } = parseArgs({
+		args: args.slice(1),
+		options: {
+			"no-sync": { type: "boolean", default: false },
+		},
+		allowPositionals: false,
+	});
+
 	await service.remove(name);
 	console.log(formatSuccess(`Task ${name} removed`));
+
+	if (!values["no-sync"]) {
+		await autoSync(repo);
+	}
 }
 
-const SUBCOMMANDS: Record<string, (args: string[], service: TaskService) => Promise<void>> = {
-	add: handleAdd,
+const QUERY_SUBCOMMANDS: Record<string, (args: string[], service: TaskService) => Promise<void>> = {
 	list: handleList,
 	get: handleGet,
+};
+
+const MUTATION_SUBCOMMANDS: Record<string, (args: string[], service: TaskService, repo: TaskRepository) => Promise<void>> = {
+	add: handleAdd,
 	update: handleUpdate,
 	remove: handleRemove,
 };
@@ -272,12 +316,12 @@ export async function runCli(argv: string[]): Promise<void> {
 		console.log("Usage: cronshed <command> [options]");
 		console.log("");
 		console.log("Commands:");
-		console.log("  add <name> --schedule '<cron>' --command '<cmd>'   Add a task");
-		console.log("  list [--json]                                      List all tasks");
-		console.log("  get <name> [--json]                                Show task details");
-		console.log("  update <name> [--schedule '<cron>'] [--command '<cmd>']  Update a task");
-		console.log("  remove <name>                                      Remove a task");
-		console.log("  sync [--dry-run] [--clear]                         Sync tasks to crontab");
+		console.log("  add <name> --schedule '<cron>' --command '<cmd>' [--no-sync]   Add a task");
+		console.log("  list [--json]                                                  List all tasks");
+		console.log("  get <name> [--json]                                            Show task details");
+		console.log("  update <name> [--schedule '<cron>'] [--command '<cmd>'] [--no-sync]  Update a task");
+		console.log("  remove <name> [--no-sync]                                     Remove a task");
+		console.log("  sync [--dry-run] [--clear]                                    Sync tasks to crontab");
 		return;
 	}
 
@@ -296,8 +340,10 @@ export async function runCli(argv: string[]): Promise<void> {
 		return;
 	}
 
-	const handler = SUBCOMMANDS[subcommand];
-	if (!handler) {
+	const mutationHandler = MUTATION_SUBCOMMANDS[subcommand];
+	const queryHandler = QUERY_SUBCOMMANDS[subcommand];
+
+	if (!mutationHandler && !queryHandler) {
 		console.error(formatError(`Unknown command "${subcommand}"`, "Run 'cronshed --help' for usage"));
 		process.exit(2);
 	}
@@ -306,7 +352,11 @@ export async function runCli(argv: string[]): Promise<void> {
 	const service = new TaskService(repo);
 
 	try {
-		await handler(args, service);
+		if (mutationHandler) {
+			await mutationHandler(args, service, repo);
+		} else {
+			await queryHandler!(args, service);
+		}
 	} catch (err) {
 		const code = getExitCode(err);
 		const hint = getErrorHint(err);

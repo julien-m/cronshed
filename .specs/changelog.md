@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-03-30 — Feature: Auto-Sync implemented
+
+- **Type:** Feature Implemented
+- **Feature:** [004-auto-sync](features/004-auto-sync/implementation.md) — 131 tests total (all pass), 8 AC, 7 FR
+- **Author:** tool (spec.feature --auto)
+
+---
+
 ## 2026-03-30 — Feature: Crontab Sync implemented
 
 - **Type:** Feature Implemented
