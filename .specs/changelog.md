@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-03-30 — Feature: Task Diagnosis implemented
+
+- **Type:** Feature Implemented
+- **Feature:** [010-task-diagnosis](features/010-task-diagnosis/implementation.md) — 313 tests total (all pass), 15 AC, 11 FR
+- **Author:** tool (spec.feature --auto)
+
+---
+
 ## 2026-03-30 — Feature: Task Pause/Resume implemented
 
 - **Type:** Feature Implemented
