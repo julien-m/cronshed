@@ -14,6 +14,7 @@ function buildTask(overrides?: Partial<Task>): Task {
 		command: "/usr/local/bin/test.sh",
 		status: "active",
 		notify: false,
+		tags: [],
 		createdAt: new Date().toISOString(),
 		...overrides,
 	};

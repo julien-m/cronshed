@@ -8,6 +8,7 @@ import {
 	EmptyCommandError,
 	TaskAlreadyPausedError,
 	TaskAlreadyActiveError,
+	InvalidTagError,
 } from "./task.errors";
 import { InvalidCronExpressionError } from "../cron/cron.errors";
 import { join } from "node:path";
@@ -282,5 +283,123 @@ describe("TaskService.resume", () => {
 		expect(resumed.schedule).toBe("0 2 * * *");
 		expect(resumed.command).toBe("echo backup");
 		expect(resumed.notify).toBe(true);
+	});
+});
+
+// @spec FR-004: Tags on add — .specs/features/013-task-groups-tags/spec.md#fr-004
+describe("TaskService.add — tags", () => {
+	test("AC-001: creates task with empty tags by default", async () => {
+		const task = await service.add({ name: "no-tags", schedule: "0 0 * * *", command: "echo hi" });
+		expect(task.tags).toEqual([]);
+	});
+
+	test("AC-002: creates task with provided tags", async () => {
+		const task = await service.add({ name: "tagged", schedule: "0 0 * * *", command: "echo hi", tags: ["backup", "db"] });
+		expect(task.tags).toEqual(["backup", "db"]);
+	});
+
+	test("AC-003: rejects invalid tag format", async () => {
+		expect(service.add({ name: "bad-tag", schedule: "0 0 * * *", command: "echo hi", tags: ["BAD TAG"] })).rejects.toThrow(InvalidTagError);
+	});
+
+	test("AC-003: rejects empty string tag", async () => {
+		expect(service.add({ name: "empty-tag", schedule: "0 0 * * *", command: "echo hi", tags: [""] })).rejects.toThrow(InvalidTagError);
+	});
+
+	test("AC-007: deduplicates tags", async () => {
+		const task = await service.add({ name: "dup-tags", schedule: "0 0 * * *", command: "echo hi", tags: ["backup", "backup", "db"] });
+		expect(task.tags).toEqual(["backup", "db"]);
+	});
+
+	test("AC-007: sorts tags alphabetically", async () => {
+		const task = await service.add({ name: "sorted-tags", schedule: "0 0 * * *", command: "echo hi", tags: ["z-tag", "a-tag", "m-tag"] });
+		expect(task.tags).toEqual(["a-tag", "m-tag", "z-tag"]);
+	});
+});
+
+// @spec FR-005: Tags on update — .specs/features/013-task-groups-tags/spec.md#fr-005
+describe("TaskService.update — tags", () => {
+	test("AC-005: adds tags to an existing task", async () => {
+		await service.add({ name: "my-task", schedule: "0 0 * * *", command: "echo hi" });
+		const updated = await service.update("my-task", { tags: ["backup"] });
+		expect(updated.tags).toEqual(["backup"]);
+	});
+
+	test("AC-005: removes tags from an existing task", async () => {
+		await service.add({ name: "my-task", schedule: "0 0 * * *", command: "echo hi", tags: ["backup", "db"] });
+		const updated = await service.update("my-task", { untags: ["db"] });
+		expect(updated.tags).toEqual(["backup"]);
+	});
+
+	test("AC-005: adds and removes tags simultaneously", async () => {
+		await service.add({ name: "my-task", schedule: "0 0 * * *", command: "echo hi", tags: ["old"] });
+		const updated = await service.update("my-task", { tags: ["new"], untags: ["old"] });
+		expect(updated.tags).toEqual(["new"]);
+	});
+
+	test("AC-006: removing nonexistent tag is a no-op", async () => {
+		await service.add({ name: "my-task", schedule: "0 0 * * *", command: "echo hi", tags: ["backup"] });
+		const updated = await service.update("my-task", { untags: ["nonexistent"] });
+		expect(updated.tags).toEqual(["backup"]);
+	});
+
+	test("AC-007: deduplicates after adding existing tag", async () => {
+		await service.add({ name: "my-task", schedule: "0 0 * * *", command: "echo hi", tags: ["backup"] });
+		const updated = await service.update("my-task", { tags: ["backup", "db"] });
+		expect(updated.tags).toEqual(["backup", "db"]);
+	});
+
+	test("AC-013: tag-only update counts as valid change", async () => {
+		await service.add({ name: "my-task", schedule: "0 0 * * *", command: "echo hi" });
+		const updated = await service.update("my-task", { tags: ["backup"] });
+		expect(updated.updatedAt).toBeDefined();
+		expect(updated.tags).toEqual(["backup"]);
+	});
+
+	test("AC-013: untag-only update counts as valid change", async () => {
+		await service.add({ name: "my-task", schedule: "0 0 * * *", command: "echo hi", tags: ["backup"] });
+		const updated = await service.update("my-task", { untags: ["backup"] });
+		expect(updated.tags).toEqual([]);
+	});
+
+	test("AC-004: rejects invalid tag on update", async () => {
+		await service.add({ name: "my-task", schedule: "0 0 * * *", command: "echo hi" });
+		expect(service.update("my-task", { tags: ["BAD TAG"] })).rejects.toThrow(InvalidTagError);
+	});
+
+	test("AC-004: rejects invalid untag on update", async () => {
+		await service.add({ name: "my-task", schedule: "0 0 * * *", command: "echo hi", tags: ["backup"] });
+		expect(service.update("my-task", { untags: ["BAD TAG"] })).rejects.toThrow(InvalidTagError);
+	});
+
+	test("removing all tags results in empty array", async () => {
+		await service.add({ name: "my-task", schedule: "0 0 * * *", command: "echo hi", tags: ["only"] });
+		const updated = await service.update("my-task", { untags: ["only"] });
+		expect(updated.tags).toEqual([]);
+	});
+});
+
+// @spec FR-006: Backward compat — .specs/features/013-task-groups-tags/spec.md#fr-006
+describe("TaskRepository backward compat — tags", () => {
+	test("AC-014: loads task without tags field with default empty array", async () => {
+		// Write a manifest without tags field
+		const tasksPath = join(tmpDir, "tasks.json");
+		const manifest = {
+			version: 1,
+			tasks: [{
+				id: "test-id",
+				name: "legacy-task",
+				schedule: "0 0 * * *",
+				command: "echo legacy",
+				status: "active",
+				notify: false,
+				createdAt: "2026-01-01T00:00:00.000Z",
+			}],
+		};
+		await Bun.write(tasksPath, JSON.stringify(manifest));
+
+		const repo = new TaskRepository(tasksPath);
+		const loaded = await repo.load();
+		expect(loaded.tasks[0]!.tags).toEqual([]);
 	});
 });

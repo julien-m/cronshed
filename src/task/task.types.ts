@@ -2,6 +2,7 @@
 
 // @spec FR-047: Task entity with notify field — .specs/features/008-failure-notifications/spec.md#fr-047
 // @spec FR-055: Status expanded to active|paused — .specs/features/009-task-pause-resume/spec.md#fr-055
+// @spec FR-001: Tags field on Task — .specs/features/013-task-groups-tags/spec.md#fr-001
 export interface Task {
 	id: string;
 	name: string;
@@ -9,6 +10,7 @@ export interface Task {
 	command: string;
 	status: TaskStatus;
 	notify: boolean;
+	tags: string[];
 	createdAt: string;
 	updatedAt?: string;
 }
@@ -18,17 +20,22 @@ export interface TaskManifest {
 	tasks: Task[];
 }
 
+// @spec FR-002: CreateTaskInput with tags — .specs/features/013-task-groups-tags/spec.md#fr-002
 export interface CreateTaskInput {
 	name: string;
 	schedule: string;
 	command: string;
 	notify?: boolean;
+	tags?: string[];
 }
 
+// @spec FR-003: UpdateTaskInput with tags/untags — .specs/features/013-task-groups-tags/spec.md#fr-003
 export interface UpdateTaskInput {
 	schedule?: string;
 	command?: string;
 	notify?: boolean;
+	tags?: string[];
+	untags?: string[];
 }
 
 // @spec FR-055: TASK_STATUS includes paused — .specs/features/009-task-pause-resume/spec.md#fr-055
@@ -47,5 +54,17 @@ export interface EnrichedTask extends Task {
 }
 
 export const TASK_NAME_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+// @spec FR-007: Tag validation uses same regex as task names — .specs/features/013-task-groups-tags/spec.md#fr-007
+export const TAG_REGEX = TASK_NAME_REGEX;
+
+/**
+ * Deduplicate and sort an array of tags.
+ * @param tags Array of tag strings
+ * @returns Sorted array of unique tags
+ */
+export function normalizeTags(tags: string[]): string[] {
+	return [...new Set(tags)].sort();
+}
 
 export const MANIFEST_VERSION = 1 as const;

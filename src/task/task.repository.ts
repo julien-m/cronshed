@@ -59,10 +59,14 @@ export class TaskRepository {
 		}
 
 		// Backward compat: tasks created before 008-failure-notifications have no notify field
+		// @spec FR-006: Backward compat for tags field — .specs/features/013-task-groups-tags/spec.md#fr-006
 		const result = parsed as TaskManifest;
 		for (const task of result.tasks) {
 			if ((task as unknown as Record<string, unknown>).notify === undefined) {
 				task.notify = false;
+			}
+			if ((task as unknown as Record<string, unknown>).tags === undefined) {
+				task.tags = [];
 			}
 		}
 		return result;
