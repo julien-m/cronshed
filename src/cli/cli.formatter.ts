@@ -3,6 +3,7 @@
 
 import type { Task, EnrichedTask } from "../task/task.types";
 import type { SyncResult, SyncDiffEntry } from "../crontab/sync.service";
+import type { ExecutionLogEntry } from "../log/log.types";
 
 // ANSI color codes for terminal output (convention: signal/noise maximal, colors for semantic meaning)
 // Respects NO_COLOR environment variable per spec: colors disabled only when NO_COLOR is set AND non-empty
@@ -196,4 +197,119 @@ export function formatSyncDiff(diff: SyncDiffEntry[]): string {
 	}
 
 	return lines.join("\n");
+}
+
+/** Maximum characters per stdout/stderr field in history table display. */
+const HISTORY_OUTPUT_MAX_CHARS = 80;
+
+/**
+ * Format a duration in milliseconds to a human-readable string.
+ * @param ms Duration in milliseconds
+ * @returns Formatted string (e.g., "1.5s", "2m 30s", "0ms")
+ */
+export function formatDuration(ms: number): string {
+	if (ms < 1000) {
+		return `${ms}ms`;
+	}
+	const totalSeconds = Math.floor(ms / 1000);
+	if (totalSeconds < 60) {
+		const decimal = ms % 1000;
+		if (decimal > 0) {
+			return `${(ms / 1000).toFixed(1)}s`;
+		}
+		return `${totalSeconds}s`;
+	}
+	const minutes = Math.floor(totalSeconds / 60);
+	const seconds = totalSeconds % 60;
+	if (seconds === 0) {
+		return `${minutes}m`;
+	}
+	return `${minutes}m ${seconds}s`;
+}
+
+/**
+ * Truncate a string to maxLen characters, appending "..." if truncated.
+ * Replaces newlines with spaces for single-line display.
+ * @param str The string to truncate
+ * @param maxLen Maximum characters
+ * @returns Truncated string
+ */
+function truncateOutput(str: string, maxLen: number): string {
+	const cleaned = str.replace(/[\n\r]/g, " ");
+	if (cleaned.length <= maxLen) {
+		return cleaned;
+	}
+	return cleaned.slice(0, maxLen) + "...";
+}
+
+/**
+ * Format an ISO timestamp to a compact display format with seconds (YYYY-MM-DD HH:MM:SS).
+ * @param iso ISO 8601 timestamp string
+ * @returns Formatted local time string
+ */
+function formatTimestampWithSeconds(iso: string): string {
+	const date = new Date(iso);
+	const y = date.getFullYear();
+	const m = String(date.getMonth() + 1).padStart(2, "0");
+	const d = String(date.getDate()).padStart(2, "0");
+	const h = String(date.getHours()).padStart(2, "0");
+	const min = String(date.getMinutes()).padStart(2, "0");
+	const sec = String(date.getSeconds()).padStart(2, "0");
+	return `${y}-${m}-${d} ${h}:${min}:${sec}`;
+}
+
+/**
+ * Format an exit code with color (green for 0, red for non-zero).
+ * @param exitCode The process exit code
+ * @returns Colored exit code string
+ */
+function formatExitCode(exitCode: number): string {
+	if (exitCode === 0) {
+		return `${ANSI_GREEN}${exitCode}${ANSI_RESET}`;
+	}
+	return `${ANSI_RED}${exitCode}${ANSI_RESET}`;
+}
+
+/**
+ * Format execution history entries as a CLI table.
+ * @spec FR-004: History table formatting — .specs/features/007-execution-history/spec.md#fr-004
+ * @spec FR-005: Output truncation — .specs/features/007-execution-history/spec.md#fr-005
+ * @param entries Array of execution log entries (already in display order)
+ * @returns Formatted table string
+ */
+export function formatHistoryTable(entries: ExecutionLogEntry[]): string {
+	const headers = ["TIMESTAMP", "EXIT CODE", "DURATION", "STDOUT", "STDERR"];
+	const rows = entries.map((e) => [
+		formatTimestampWithSeconds(e.timestamp),
+		formatExitCode(e.exitCode),
+		formatDuration(e.durationMs),
+		truncateOutput(e.stdout, HISTORY_OUTPUT_MAX_CHARS),
+		truncateOutput(e.stderr, HISTORY_OUTPUT_MAX_CHARS),
+	]);
+
+	// Calculate column widths using raw (uncolored) text for alignment
+	const rawRows = entries.map((e) => [
+		formatTimestampWithSeconds(e.timestamp),
+		String(e.exitCode),
+		formatDuration(e.durationMs),
+		truncateOutput(e.stdout, HISTORY_OUTPUT_MAX_CHARS),
+		truncateOutput(e.stderr, HISTORY_OUTPUT_MAX_CHARS),
+	]);
+
+	const colWidths = headers.map((h, i) =>
+		Math.max(h.length, ...rawRows.map((r) => (r[i] ?? "").length))
+	);
+
+	const pad = (str: string, width: number, rawStr?: string) => {
+		const rawLen = rawStr !== undefined ? rawStr.length : str.length;
+		const padding = Math.max(0, width - rawLen);
+		return str + " ".repeat(padding);
+	};
+
+	const headerLine = headers.map((h, i) => pad(h, colWidths[i]!)).join("  ");
+	const dataLines = rows.map((row, rowIdx) =>
+		row.map((cell, colIdx) => pad(cell ?? "", colWidths[colIdx]!, rawRows[rowIdx]![colIdx])).join("  ")
+	);
+
+	return [headerLine, ...dataLines].join("\n");
 }

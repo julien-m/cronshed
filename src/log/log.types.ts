@@ -8,3 +8,17 @@ export interface LastExecution {
 	exitCode: number;
 	durationMs: number;
 }
+
+// @spec FR-002: ExecutionLogEntry type — .specs/features/007-execution-history/spec.md#fr-002
+
+/**
+ * A single parsed entry from the JSONL execution log file.
+ * Contains all fields written by wrapper scripts.
+ */
+export interface ExecutionLogEntry {
+	timestamp: string;
+	exitCode: number;
+	durationMs: number;
+	stdout: string;
+	stderr: string;
+}

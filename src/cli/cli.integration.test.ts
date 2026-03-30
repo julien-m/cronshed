@@ -289,3 +289,170 @@ describe("command path resolution", () => {
 		expect(task.command).toBe("echo hi");
 	});
 });
+
+// --- Execution History (Feature 007) ---
+
+async function writeLogEntries(taskName: string, entries: Record<string, unknown>[]): Promise<void> {
+	const { mkdir } = await import("node:fs/promises");
+	const logsDir = join(tmpDir, "logs");
+	await mkdir(logsDir, { recursive: true });
+	const lines = entries.map((e) => JSON.stringify(e)).join("\n") + "\n";
+	await Bun.write(join(logsDir, `${taskName}.jsonl`), lines);
+}
+
+function makeHistoryEntry(overrides?: Partial<{ timestamp: string; exitCode: number; durationMs: number; stdout: string; stderr: string }>): Record<string, unknown> {
+	return {
+		timestamp: "2026-03-30T02:00:05Z",
+		exitCode: 0,
+		durationMs: 1500,
+		stdout: "",
+		stderr: "",
+		...overrides,
+	};
+}
+
+describe("cronshed history", () => {
+	// @spec AC-001: history displays entries in reverse chronological order
+	test("AC-001: displays history entries in reverse chronological order", async () => {
+		await run("add", "backup-db", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
+		await writeLogEntries("backup-db", [
+			makeHistoryEntry({ timestamp: "2026-03-28T02:00:05Z" }),
+			makeHistoryEntry({ timestamp: "2026-03-29T02:00:05Z" }),
+			makeHistoryEntry({ timestamp: "2026-03-30T02:00:05Z" }),
+		]);
+
+		const { stdout, exitCode } = await run("history", "backup-db");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("TIMESTAMP");
+		expect(stdout).toContain("EXIT CODE");
+		expect(stdout).toContain("DURATION");
+		// Most recent should appear first in output
+		const lines = stdout.split("\n").filter((l: string) => l.trim().length > 0);
+		expect(lines.length).toBe(4); // header + 3 entries
+		expect(lines[1]).toContain("2026-03-30");
+		expect(lines[3]).toContain("2026-03-28");
+	});
+
+	// @spec AC-004: default limit is 10
+	test("AC-004: limits to 10 entries by default", async () => {
+		await run("add", "busy-task", "--schedule", "* * * * *", "--command", "echo hi", "--no-sync");
+		const entries = Array.from({ length: 15 }, (_, i) =>
+			makeHistoryEntry({ timestamp: `2026-03-${String(i + 10).padStart(2, "0")}T02:00:05Z` })
+		);
+		await writeLogEntries("busy-task", entries);
+
+		const { stdout, exitCode } = await run("history", "busy-task");
+		expect(exitCode).toBe(0);
+		const lines = stdout.split("\n").filter((l: string) => l.trim().length > 0);
+		expect(lines.length).toBe(11); // header + 10 entries
+	});
+
+	// @spec AC-005: --limit N restricts output
+	test("AC-005: --limit restricts number of entries", async () => {
+		await run("add", "backup-db", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
+		await writeLogEntries("backup-db", [
+			makeHistoryEntry({ timestamp: "2026-03-28T02:00:05Z" }),
+			makeHistoryEntry({ timestamp: "2026-03-29T02:00:05Z" }),
+			makeHistoryEntry({ timestamp: "2026-03-30T02:00:05Z" }),
+		]);
+
+		const { stdout, exitCode } = await run("history", "backup-db", "--limit", "2");
+		expect(exitCode).toBe(0);
+		const lines = stdout.split("\n").filter((l: string) => l.trim().length > 0);
+		expect(lines.length).toBe(3); // header + 2 entries
+	});
+
+	// @spec AC-006: --json outputs valid JSON array
+	test("AC-006: --json outputs valid JSON array", async () => {
+		await run("add", "backup-db", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
+		await writeLogEntries("backup-db", [
+			makeHistoryEntry({ timestamp: "2026-03-28T02:00:05Z", stdout: "ok" }),
+			makeHistoryEntry({ timestamp: "2026-03-29T02:00:05Z" }),
+		]);
+
+		const { stdout, exitCode } = await run("history", "backup-db", "--json");
+		expect(exitCode).toBe(0);
+		const parsed = JSON.parse(stdout);
+		expect(Array.isArray(parsed)).toBe(true);
+		expect(parsed).toHaveLength(2);
+		// Most recent first
+		expect(parsed[0].timestamp).toBe("2026-03-29T02:00:05Z");
+		expect(parsed[1].timestamp).toBe("2026-03-28T02:00:05Z");
+		expect(parsed[1].stdout).toBe("ok");
+	});
+
+	// @spec AC-007: --json with no history outputs []
+	test("AC-007: --json with no history outputs empty array", async () => {
+		await run("add", "new-task", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
+
+		const { stdout, exitCode } = await run("history", "new-task", "--json");
+		expect(exitCode).toBe(0);
+		expect(JSON.parse(stdout)).toEqual([]);
+	});
+
+	// @spec AC-008: non-existent task gives exit code 1
+	test("AC-008: non-existent task gives error with exit code 1", async () => {
+		const { stderr, exitCode } = await run("history", "ghost-task");
+		expect(exitCode).toBe(1);
+		expect(stderr).toContain('Task "ghost-task" not found');
+	});
+
+	// @spec AC-009: missing name gives exit code 2
+	test("AC-009: missing task name gives error with exit code 2", async () => {
+		const { stderr, exitCode } = await run("history");
+		expect(exitCode).toBe(2);
+		expect(stderr).toContain("Missing task name");
+		expect(stderr).toContain("Usage:");
+	});
+
+	// @spec AC-010: no log file shows message
+	test("AC-010: task with no log file shows no-history message", async () => {
+		await run("add", "new-task", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
+
+		const { stdout, exitCode } = await run("history", "new-task");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("No execution history for new-task");
+	});
+
+	// @spec AC-012: --json respects --limit
+	test("AC-012: --json respects --limit", async () => {
+		await run("add", "backup-db", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
+		await writeLogEntries("backup-db", [
+			makeHistoryEntry({ timestamp: "2026-03-28T02:00:05Z" }),
+			makeHistoryEntry({ timestamp: "2026-03-29T02:00:05Z" }),
+			makeHistoryEntry({ timestamp: "2026-03-30T02:00:05Z" }),
+		]);
+
+		const { stdout, exitCode } = await run("history", "backup-db", "--json", "--limit", "1");
+		expect(exitCode).toBe(0);
+		const parsed = JSON.parse(stdout);
+		expect(parsed).toHaveLength(1);
+		expect(parsed[0].timestamp).toBe("2026-03-30T02:00:05Z");
+	});
+
+	// @spec AC-013: history command in help output
+	test("AC-013: history command appears in --help output", async () => {
+		const { stdout, exitCode } = await run("--help");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("history");
+	});
+
+	// @spec AC-011: corrupted lines skipped in integration
+	test("AC-011: corrupted log lines are silently skipped", async () => {
+		await run("add", "bad-logs", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
+		const { mkdir } = await import("node:fs/promises");
+		const logsDir = join(tmpDir, "logs");
+		await mkdir(logsDir, { recursive: true });
+		const lines = [
+			JSON.stringify(makeHistoryEntry({ timestamp: "2026-03-28T02:00:05Z" })),
+			"this is not valid json",
+			JSON.stringify(makeHistoryEntry({ timestamp: "2026-03-30T02:00:05Z" })),
+		].join("\n") + "\n";
+		await Bun.write(join(logsDir, "bad-logs.jsonl"), lines);
+
+		const { stdout, exitCode } = await run("history", "bad-logs");
+		expect(exitCode).toBe(0);
+		const outputLines = stdout.split("\n").filter((l: string) => l.trim().length > 0);
+		expect(outputLines.length).toBe(3); // header + 2 valid entries
+	});
+});

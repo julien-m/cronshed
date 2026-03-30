@@ -1,5 +1,5 @@
 import { test, expect, describe, beforeEach, afterEach } from "bun:test";
-import { getLastExecution } from "./log.service";
+import { getLastExecution, getExecutionHistory } from "./log.service";
 import { join } from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -121,5 +121,91 @@ describe("getLastExecution", () => {
 
 		expect(result).not.toBeNull();
 		expect(result!.timestamp).toBe("2026-03-28T02:00:05Z");
+	});
+});
+
+describe("getExecutionHistory", () => {
+	// @spec AC-001: Returns entries from log file
+	// @spec AC-011: Corrupted lines silently skipped
+
+	test("AC-001: returns all valid entries from log file", async () => {
+		await writeLogFile("backup-db", [
+			makeLogEntry({ timestamp: "2026-03-28T02:00:05Z", exitCode: 0, durationMs: 1000 }),
+			makeLogEntry({ timestamp: "2026-03-29T02:00:05Z", exitCode: 0, durationMs: 1200 }),
+			makeLogEntry({ timestamp: "2026-03-30T02:00:05Z", exitCode: 1, durationMs: 500 }),
+		]);
+
+		const result = await getExecutionHistory("backup-db");
+
+		expect(result).toHaveLength(3);
+		expect(result[0]!.timestamp).toBe("2026-03-28T02:00:05Z");
+		expect(result[1]!.timestamp).toBe("2026-03-29T02:00:05Z");
+		expect(result[2]!.timestamp).toBe("2026-03-30T02:00:05Z");
+		expect(result[2]!.exitCode).toBe(1);
+		expect(result[2]!.durationMs).toBe(500);
+	});
+
+	test("AC-001: entries include stdout and stderr fields", async () => {
+		await writeLogFile("backup-db", [
+			makeLogEntry({ timestamp: "2026-03-30T02:00:05Z", exitCode: 0, durationMs: 1500, stdout: "ok", stderr: "" }),
+		]);
+
+		const result = await getExecutionHistory("backup-db");
+
+		expect(result).toHaveLength(1);
+		expect(result[0]!.stdout).toBe("ok");
+		expect(result[0]!.stderr).toBe("");
+	});
+
+	test("AC-010: returns empty array when log file does not exist", async () => {
+		const result = await getExecutionHistory("nonexistent-task");
+		expect(result).toEqual([]);
+	});
+
+	test("AC-010: returns empty array when log file is empty", async () => {
+		const logsDir = join(tempDir, "logs");
+		const { mkdir } = await import("node:fs/promises");
+		await mkdir(logsDir, { recursive: true });
+		await Bun.write(join(logsDir, "empty-task.jsonl"), "");
+
+		const result = await getExecutionHistory("empty-task");
+		expect(result).toEqual([]);
+	});
+
+	test("AC-011: skips corrupted lines and returns valid entries", async () => {
+		await writeLogFile("mixed-task", [
+			makeLogEntry({ timestamp: "2026-03-28T02:00:05Z", exitCode: 0, durationMs: 1000 }),
+			"this is not valid json",
+			makeLogEntry({ timestamp: "2026-03-30T02:00:05Z", exitCode: 0, durationMs: 1500 }),
+		]);
+
+		const result = await getExecutionHistory("mixed-task");
+
+		expect(result).toHaveLength(2);
+		expect(result[0]!.timestamp).toBe("2026-03-28T02:00:05Z");
+		expect(result[1]!.timestamp).toBe("2026-03-30T02:00:05Z");
+	});
+
+	test("AC-011: returns empty array when all lines are corrupted", async () => {
+		await writeLogFile("all-bad", [
+			"not json at all",
+			"also not json",
+			"{invalid json too",
+		]);
+
+		const result = await getExecutionHistory("all-bad");
+		expect(result).toEqual([]);
+	});
+
+	test("AC-011: handles entries with missing stdout/stderr gracefully", async () => {
+		await writeLogFile("no-output", [
+			JSON.stringify({ timestamp: "2026-03-30T02:00:05Z", exitCode: 0, durationMs: 1000 }),
+		]);
+
+		const result = await getExecutionHistory("no-output");
+
+		expect(result).toHaveLength(1);
+		expect(result[0]!.stdout).toBe("");
+		expect(result[0]!.stderr).toBe("");
 	});
 });

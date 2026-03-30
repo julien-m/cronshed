@@ -1,7 +1,8 @@
 // @spec FR-002: Read last execution from logs — .specs/features/006-task-listing-status/spec.md#fr-002
+// @spec FR-001: Read execution history — .specs/features/007-execution-history/spec.md#fr-001
 
 import { getLogPath } from "../app/config";
-import type { LastExecution } from "./log.types";
+import type { LastExecution, ExecutionLogEntry } from "./log.types";
 
 /** Maximum bytes to read from the end of a log file. */
 const TAIL_BYTES = 4096;
@@ -67,4 +68,66 @@ function tryParseLogEntry(line: string): LastExecution | null {
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * Attempt to parse a single JSONL line into a full ExecutionLogEntry.
+ * @param line Raw line from the log file
+ * @returns Parsed ExecutionLogEntry or null if invalid
+ */
+function tryParseFullLogEntry(line: string): ExecutionLogEntry | null {
+	try {
+		const entry = JSON.parse(line);
+		if (
+			typeof entry.timestamp === "string" &&
+			typeof entry.exitCode === "number" &&
+			typeof entry.durationMs === "number"
+		) {
+			return {
+				timestamp: entry.timestamp,
+				exitCode: entry.exitCode,
+				durationMs: entry.durationMs,
+				stdout: typeof entry.stdout === "string" ? entry.stdout : "",
+				stderr: typeof entry.stderr === "string" ? entry.stderr : "",
+			};
+		}
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Get the full execution history for a task by reading its JSONL log file.
+ * Parses all valid entries, silently skipping corrupted lines.
+ * @param taskName The task name (used to resolve log file path)
+ * @returns Array of valid execution entries in file order (oldest first)
+ */
+// @spec FR-001: Read execution history — .specs/features/007-execution-history/spec.md#fr-001
+export async function getExecutionHistory(taskName: string): Promise<ExecutionLogEntry[]> {
+	const logPath = getLogPath(taskName);
+	const file = Bun.file(logPath);
+
+	const exists = await file.exists();
+	if (!exists) {
+		return [];
+	}
+
+	const size = file.size;
+	if (size === 0) {
+		return [];
+	}
+
+	const content = await file.text();
+	const lines = content.split("\n").filter((line) => line.trim().length > 0);
+	const entries: ExecutionLogEntry[] = [];
+
+	for (const line of lines) {
+		const parsed = tryParseFullLogEntry(line);
+		if (parsed !== null) {
+			entries.push(parsed);
+		}
+	}
+
+	return entries;
 }
