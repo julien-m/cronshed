@@ -6,6 +6,7 @@ import type { Task, EnrichedTask } from "../task/task.types";
 import type { SyncResult, SyncDiffEntry } from "../crontab/sync.service";
 import type { ExecutionLogEntry } from "../log/log.types";
 import type { DiagnosisResult } from "../diagnosis/diagnosis.types";
+import type { ImportResult, ImportedEntry, SkippedEntry } from "../import/import.types";
 
 // ANSI color codes for terminal output (convention: signal/noise maximal, colors for semantic meaning)
 // Respects NO_COLOR environment variable per spec: colors disabled only when NO_COLOR is set AND non-empty
@@ -362,4 +363,57 @@ export function formatDiagnosisSummary(results: DiagnosisResult[]): string {
 
 	const taskWord = total === 1 ? "task" : "tasks";
 	return `${total} ${taskWord} checked, ${ok} ok, ${withIssues} with issues`;
+}
+
+// @spec FR-080: Import preview formatting, FR-083: Import summary — .specs/features/011-import-existing-crontab/spec.md#fr-080
+
+/**
+ * Format a preview table of entries that would be imported (dry-run output).
+ * Shows NAME, SCHEDULE, COMMAND columns with dynamic widths.
+ * @param entries Array of entries to preview
+ * @returns Formatted table string
+ */
+export function formatImportPreview(entries: ImportedEntry[]): string {
+	const headers = ["NAME", "SCHEDULE", "COMMAND"];
+	const rows = entries.map((e) => [e.name, e.schedule, e.command]);
+
+	const colWidths = headers.map((h, i) =>
+		Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length))
+	);
+
+	const pad = (str: string, width: number) => str.padEnd(width);
+	const headerLine = headers.map((h, i) => pad(h, colWidths[i]!)).join("  ");
+	const dataLines = rows.map((row) =>
+		row.map((cell, i) => pad(cell ?? "", colWidths[i]!)).join("  ")
+	);
+
+	return [headerLine, ...dataLines].join("\n");
+}
+
+/**
+ * Format the import summary message.
+ * @param result The import result
+ * @returns Summary string: "Imported N tasks" or "No entries to import"
+ */
+export function formatImportSummary(result: ImportResult): string {
+	if (result.imported.length === 0) {
+		return "No entries to import";
+	}
+
+	if (result.dryRun) {
+		const taskWord = result.imported.length === 1 ? "task" : "tasks";
+		return `Would import ${result.imported.length} ${taskWord}`;
+	}
+
+	const taskWord = result.imported.length === 1 ? "task" : "tasks";
+	return formatSuccess(`Imported ${result.imported.length} ${taskWord}`);
+}
+
+/**
+ * Format a warning for a skipped import entry.
+ * @param entry The skipped entry
+ * @returns Formatted warning string
+ */
+export function formatSkippedWarning(entry: SkippedEntry): string {
+	return formatWarning(`Skipped: ${entry.reason}`, entry.line);
 }

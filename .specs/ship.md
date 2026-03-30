@@ -10,10 +10,10 @@
 | 1 | 005-wrapper-script-generation | Done | feature/005-wrapper-script-generation | 2026-03-30 | 2026-03-30 |
 | 2 | 006-task-listing-status | Done | feature/006-task-listing-status | 2026-03-30 | 2026-03-30 |
 | 3 | 007-execution-history | Done | feature/007-execution-history | 2026-03-30 | 2026-03-30 |
-| 4 | 008-failure-notifications | In Progress | feature/008-failure-notifications | 2026-03-30 | — |
-| 5 | 009-task-pause-resume | Pending | — | — | — |
-| 6 | 010-task-diagnosis | Pending | — | — | — |
-| 7 | 011-import-existing-crontab | Pending | — | — | — |
+| 4 | 008-failure-notifications | Done | feature/008-failure-notifications | 2026-03-30 | 2026-03-30 |
+| 5 | 009-task-pause-resume | Done | feature/009-task-pause-resume | 2026-03-30 | 2026-03-30 |
+| 6 | 010-task-diagnosis | Done | feature/010-task-diagnosis | 2026-03-30 | 2026-03-30 |
+| 7 | 011-import-existing-crontab | In Progress | feature/011-import-existing-crontab | 2026-03-30 | — |
 | 8 | 012-log-rotation | Pending | — | — | — |
 | 9 | 013-task-groups-tags | Pending | — | — | — |
 | 10 | 014-dry-run-mode | Pending | — | — | — |
