@@ -2,7 +2,7 @@
 
 > Specification registry for Cronshed. All artifacts produced by LiveSpec are indexed here.
 >
-> Last updated: 2026-03-30 (001-task-manifest)
+> Last updated: 2026-03-30 (002-command-path-resolution)
 
 ---
 
@@ -35,6 +35,7 @@
 | # | Feature | Status | Created | Updated | Spec |
 |---|---|---|---|---|---|
 | 001 | Task Manifest & CRUD | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/001-task-manifest/spec.md) |
+| 002 | Command Path Resolution | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/002-command-path-resolution/spec.md) |
 <!-- readme:features:end -->
 
 ---

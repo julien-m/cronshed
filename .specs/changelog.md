@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-03-30 — Feature: Command Path Resolution implemented
+
+- **Type:** Feature Implemented
+- **Feature:** [002-command-path-resolution](features/002-command-path-resolution/implementation.md) — 24 tests, 10 AC, all passing
+- **Author:** tool (spec.feature --auto)
+
+---
+
 ## 2026-03-30 — Feature: Task Manifest & CRUD implemented
 
 - **Type:** Feature Implemented

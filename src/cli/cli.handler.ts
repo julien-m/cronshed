@@ -14,13 +14,22 @@ import {
 	ManifestVersionError,
 	ManifestAccessError,
 } from "../task/task.errors";
+import { resolveCommand } from "./command.resolver";
+import {
+	CommandFileNotFoundError,
+	CommandFileNotExecutableError,
+	CommandPathIsDirectoryError,
+} from "./command.errors";
 import { formatTaskTable, formatTaskDetails, formatSuccess, formatError } from "./cli.formatter";
 
 function getExitCode(err: unknown): number {
 	if (
 		err instanceof InvalidCronExpressionError ||
 		err instanceof InvalidTaskNameError ||
-		err instanceof EmptyCommandError
+		err instanceof EmptyCommandError ||
+		err instanceof CommandFileNotFoundError ||
+		err instanceof CommandFileNotExecutableError ||
+		err instanceof CommandPathIsDirectoryError
 	) {
 		return 2;
 	}
@@ -48,6 +57,15 @@ function getErrorHint(err: unknown): string | undefined {
 	}
 	if (err instanceof ManifestAccessError) {
 		return `Check permissions for: ${err.path}`;
+	}
+	if (err instanceof CommandFileNotFoundError) {
+		return `Resolved to: ${err.resolved}`;
+	}
+	if (err instanceof CommandFileNotExecutableError) {
+		return `Run: chmod +x ${err.resolved}`;
+	}
+	if (err instanceof CommandPathIsDirectoryError) {
+		return "Expected a file, not a directory";
 	}
 	return undefined;
 }
@@ -77,12 +95,20 @@ async function handleAdd(args: string[], service: TaskService): Promise<void> {
 		process.exit(2);
 	}
 
+	// @spec FR-016: Include resolved path in success message, FR-017: Path resolution on add — .specs/features/002-command-path-resolution/spec.md#fr-016
+	const resolution = await resolveCommand(values.command);
+
 	const task = await service.add({
 		name,
 		schedule: values.schedule,
-		command: values.command,
+		command: resolution.resolved,
 	});
-	console.log(formatSuccess(`Task ${task.name} created`));
+
+	if (resolution.isFilePath) {
+		console.log(formatSuccess(`Task ${task.name} created (command: ${resolution.resolved})`));
+	} else {
+		console.log(formatSuccess(`Task ${task.name} created`));
+	}
 }
 
 async function handleList(args: string[], service: TaskService): Promise<void> {
@@ -158,9 +184,16 @@ async function handleUpdate(args: string[], service: TaskService): Promise<void>
 		allowPositionals: false,
 	});
 
+	// @spec FR-017: Path resolution on update — .specs/features/002-command-path-resolution/spec.md#fr-017
+	let resolvedCommand = values.command;
+	if (values.command) {
+		const resolution = await resolveCommand(values.command);
+		resolvedCommand = resolution.resolved;
+	}
+
 	const task = await service.update(name, {
 		schedule: values.schedule,
-		command: values.command,
+		command: resolvedCommand,
 	});
 	console.log(formatSuccess(`Task ${task.name} updated`));
 }

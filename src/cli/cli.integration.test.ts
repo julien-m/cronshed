@@ -188,3 +188,104 @@ describe("error handling", () => {
 		expect(stderr).toContain('Unknown command "bogus"');
 	});
 });
+
+describe("command path resolution", () => {
+	test("AC-021: add with relative script path resolves to absolute", async () => {
+		const scriptPath = join(tmpDir, "test-script.sh");
+		await Bun.write(scriptPath, "#!/bin/sh\necho hi");
+		const { chmod } = await import("node:fs/promises");
+		await chmod(scriptPath, 0o755);
+
+		const { stdout, exitCode } = await run("add", "scripted", "--schedule", "0 0 * * *", "--command", scriptPath);
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("Task scripted created");
+		expect(stdout).toContain(scriptPath);
+
+		// Verify the absolute path is stored
+		const { stdout: details } = await run("get", "scripted", "--json");
+		const task = JSON.parse(details);
+		expect(task.command).toBe(scriptPath);
+	});
+
+	test("AC-024: add with non-existent path gives exit code 2", async () => {
+		const missing = join(tmpDir, "nonexistent.sh");
+		const { stderr, exitCode } = await run("add", "broken", "--schedule", "0 0 * * *", "--command", missing);
+		expect(exitCode).toBe(2);
+		expect(stderr).toContain("File not found");
+		expect(stderr).toContain("Resolved to:");
+	});
+
+	test("AC-025: add with non-executable file gives exit code 2", async () => {
+		const scriptPath = join(tmpDir, "no-exec.sh");
+		await Bun.write(scriptPath, "#!/bin/sh\necho hi");
+		const { chmod } = await import("node:fs/promises");
+		await chmod(scriptPath, 0o644);
+
+		const { stderr, exitCode } = await run("add", "bad-exec", "--schedule", "0 0 * * *", "--command", scriptPath);
+		expect(exitCode).toBe(2);
+		expect(stderr).toContain("not executable");
+		expect(stderr).toContain("chmod +x");
+	});
+
+	test("AC-026: add with inline command stores as-is", async () => {
+		const { stdout, exitCode } = await run("add", "inline", "--schedule", "0 0 * * *", "--command", "echo hello world");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("Task inline created");
+
+		const { stdout: details } = await run("get", "inline", "--json");
+		const task = JSON.parse(details);
+		expect(task.command).toBe("echo hello world");
+	});
+
+	test("edge case 7: add with directory path gives exit code 2", async () => {
+		const dir = join(tmpDir, "a-directory");
+		const { mkdir: mkdirFs } = await import("node:fs/promises");
+		await mkdirFs(dir);
+
+		const { stderr, exitCode } = await run("add", "dir-cmd", "--schedule", "0 0 * * *", "--command", dir);
+		expect(exitCode).toBe(2);
+		expect(stderr).toContain("directory");
+	});
+
+	test("AC-029: update --command with relative path resolves", async () => {
+		await run("add", "updatable", "--schedule", "0 0 * * *", "--command", "echo initial");
+
+		const scriptPath = join(tmpDir, "updated-script.sh");
+		await Bun.write(scriptPath, "#!/bin/sh\necho updated");
+		const { chmod } = await import("node:fs/promises");
+		await chmod(scriptPath, 0o755);
+
+		const { stdout, exitCode } = await run("update", "updatable", "--command", scriptPath);
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("Task updatable updated");
+
+		const { stdout: details } = await run("get", "updatable", "--json");
+		const task = JSON.parse(details);
+		expect(task.command).toBe(scriptPath);
+	});
+
+	test("AC-025: update --command with non-executable file gives exit code 2", async () => {
+		await run("add", "updatable2", "--schedule", "0 0 * * *", "--command", "echo initial");
+
+		const scriptPath = join(tmpDir, "no-exec-update.sh");
+		await Bun.write(scriptPath, "#!/bin/sh\necho hi");
+		const { chmod } = await import("node:fs/promises");
+		await chmod(scriptPath, 0o644);
+
+		const { stderr, exitCode } = await run("update", "updatable2", "--command", scriptPath);
+		expect(exitCode).toBe(2);
+		expect(stderr).toContain("not executable");
+	});
+
+	test("AC-029: update --schedule only does not trigger path resolution", async () => {
+		await run("add", "sched-only", "--schedule", "0 0 * * *", "--command", "echo hi");
+		const { stdout, exitCode } = await run("update", "sched-only", "--schedule", "0 4 * * *");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("Task sched-only updated");
+
+		const { stdout: details } = await run("get", "sched-only", "--json");
+		const task = JSON.parse(details);
+		expect(task.schedule).toBe("0 4 * * *");
+		expect(task.command).toBe("echo hi");
+	});
+});
