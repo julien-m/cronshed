@@ -2,7 +2,7 @@
 
 > Specification registry for Cronshed. All artifacts produced by LiveSpec are indexed here.
 >
-> Last updated: 2026-03-30 (013-task-groups-tags)
+> Last updated: 2026-03-30 (014-dry-run-mode)
 
 ---
 
@@ -47,6 +47,7 @@
 | 011 | Import Existing Crontab | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/011-import-existing-crontab/spec.md) |
 | 012 | Log Rotation | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/012-log-rotation/spec.md) |
 | 013 | Task Groups/Tags | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/013-task-groups-tags/spec.md) |
+| 014 | Dry-run Mode | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/014-dry-run-mode/spec.md) |
 <!-- readme:features:end -->
 
 ---
@@ -69,6 +70,7 @@
 <!-- readme:activity:start -->
 | Date | Type | Description |
 |---|---|---|
+| 2026-03-30 | Feature | [014] Implemented: Dry-run Mode — 5 stories, 12 AC, 11 FR, 447 tests |
 | 2026-03-30 | Feature | [013] Implemented: Task Groups/Tags — 5 stories, 14 AC, 15 FR, 433 tests |
 | 2026-03-30 | Feature | [012] Implemented: Log Rotation — 5 stories, 14 AC, 10 FR, 396 tests |
 | 2026-03-30 | Feature | [011] Implemented: Import Existing Crontab — 6 stories, 15 AC, 11 FR, 363 tests |

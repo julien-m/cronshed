@@ -463,6 +463,23 @@ export function formatRotationSummary(results: RotationResult[], dryRun: boolean
 	return lines.join("\n");
 }
 
+// @spec FR-006: Run summary formatting — .specs/features/014-dry-run-mode/spec.md#fr-006
+
+/**
+ * Format the execution summary line for `cronshed run`.
+ * Green checkmark + "completed" for exit 0, red cross + "failed" for non-zero.
+ * @param taskName The task name
+ * @param exitCode The process exit code
+ * @param durationMs Execution duration in milliseconds
+ * @returns Formatted summary string
+ */
+export function formatRunSummary(taskName: string, exitCode: number, durationMs: number): string {
+	if (exitCode === 0) {
+		return `${ANSI_GREEN}\u2713${ANSI_RESET} ${taskName} completed (exit 0) in ${formatDuration(durationMs)}`;
+	}
+	return `${ANSI_RED}\u2717${ANSI_RESET} ${taskName} failed (exit ${exitCode}) in ${formatDuration(durationMs)}`;
+}
+
 // @spec FR-012: Tags table formatting — .specs/features/013-task-groups-tags/spec.md#fr-012
 
 /**
