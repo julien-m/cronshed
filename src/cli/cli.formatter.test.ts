@@ -1,5 +1,5 @@
 import { test, expect, describe } from "bun:test";
-import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatDuration, formatSuccess, formatError, formatWarning, formatSyncConfirmation } from "./cli.formatter";
+import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatDuration, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatRotationSummary } from "./cli.formatter";
 import type { Task, EnrichedTask } from "../task/task.types";
 import type { ExecutionLogEntry } from "../log/log.types";
 
@@ -300,5 +300,56 @@ describe("formatHistoryTable", () => {
 		const output = formatHistoryTable([shortEntry]);
 		expect(output).toContain("short output");
 		expect(output).not.toContain("...");
+	});
+});
+
+// @spec FR-007: Rotation summary formatting — .specs/features/012-log-rotation/spec.md#fr-007
+describe("formatRotationSummary", () => {
+	test("AC-007: shows per-task stats and total", () => {
+		const results = [
+			{ taskName: "backup-db", entriesBefore: 100, entriesAfter: 50, entriesRemoved: 50 },
+			{ taskName: "sync-files", entriesBefore: 200, entriesAfter: 180, entriesRemoved: 20 },
+		];
+		const output = formatRotationSummary(results, false);
+		expect(output).toContain("backup-db: Removed 50 entries");
+		expect(output).toContain("sync-files: Removed 20 entries");
+		expect(output).toContain("70 entries across 2 tasks");
+	});
+
+	test("AC-008: shows nothing to rotate when no entries removed", () => {
+		const results = [
+			{ taskName: "backup-db", entriesBefore: 10, entriesAfter: 10, entriesRemoved: 0 },
+		];
+		const output = formatRotationSummary(results, false);
+		expect(output).toBe("Nothing to rotate");
+	});
+
+	test("shows dry-run prefix", () => {
+		const results = [
+			{ taskName: "backup-db", entriesBefore: 100, entriesAfter: 50, entriesRemoved: 50 },
+		];
+		const output = formatRotationSummary(results, true);
+		expect(output).toContain("Would remove 50 entries");
+		expect(output).toContain("Would remove 50 entries across 1 task");
+	});
+
+	test("handles single task with singular entry word", () => {
+		const results = [
+			{ taskName: "backup-db", entriesBefore: 2, entriesAfter: 1, entriesRemoved: 1 },
+		];
+		const output = formatRotationSummary(results, false);
+		expect(output).toContain("Removed 1 entry");
+		expect(output).toContain("1 entry across 1 task");
+	});
+
+	test("filters out tasks with zero removals", () => {
+		const results = [
+			{ taskName: "backup-db", entriesBefore: 100, entriesAfter: 50, entriesRemoved: 50 },
+			{ taskName: "fresh-task", entriesBefore: 5, entriesAfter: 5, entriesRemoved: 0 },
+		];
+		const output = formatRotationSummary(results, false);
+		expect(output).toContain("backup-db");
+		expect(output).not.toContain("fresh-task");
+		expect(output).toContain("50 entries across 1 task");
 	});
 });

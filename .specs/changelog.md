@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-03-30 — Feature: Log Rotation implemented
+
+- **Type:** Feature Implemented
+- **Feature:** [012-log-rotation](features/012-log-rotation/implementation.md) — 396 tests total (all pass), 14 AC, 10 FR
+- **Author:** tool (spec.feature --auto)
+
+---
+
 ## 2026-03-30 — Feature: Import Existing Crontab implemented
 
 - **Type:** Feature Implemented

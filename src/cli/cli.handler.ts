@@ -27,15 +27,16 @@ import {
 } from "./command.errors";
 import { WrapperService } from "../wrapper/wrapper.service";
 import { WrapperGenerationError } from "../wrapper/wrapper.errors";
-import { getDataDir } from "../app/config";
+import { getDataDir, getLogPath } from "../app/config";
 import { getNextExecution } from "../cron/cron.service";
 import { getLastExecution } from "../log/log.service";
 import type { Task, EnrichedTask } from "../task/task.types";
 import { TASK_STATUS } from "../task/task.types";
-import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff, formatDiagnosisReport, formatImportPreview, formatImportSummary, formatSkippedWarning } from "./cli.formatter";
+import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff, formatDiagnosisReport, formatImportPreview, formatImportSummary, formatSkippedWarning, formatRotationSummary } from "./cli.formatter";
 import { importCrontabEntries } from "../import/import.service";
 import { getExecutionHistory } from "../log/log.service";
 import { DiagnosisService } from "../diagnosis/diagnosis.service";
+import { rotateLogFile, rotateAllLogs, DEFAULT_MAX_AGE_DAYS, DEFAULT_MAX_ENTRIES } from "../log/rotation.service";
 
 // @spec FR-022: Sync handler, FR-024: Dry-run display, FR-027: Error handling — .specs/features/003-crontab-sync/spec.md#fr-022
 async function handleSync(args: string[]): Promise<void> {
@@ -592,6 +593,65 @@ async function handleImport(args: string[]): Promise<void> {
 	await autoSync(repo);
 }
 
+// @spec FR-005: Rotate CLI handler, FR-006: Command registration — .specs/features/012-log-rotation/spec.md#fr-005
+async function handleRotate(args: string[]): Promise<void> {
+	// Parse optional task name (first positional arg, if not a flag)
+	const name = args[0] && !args[0].startsWith("--") ? args[0] : undefined;
+	const restArgs = name ? args.slice(1) : args;
+
+	const { values } = parseArgs({
+		args: restArgs,
+		options: {
+			"max-age": { type: "string" },
+			"max-entries": { type: "string" },
+			"dry-run": { type: "boolean", default: false },
+			json: { type: "boolean", default: false },
+		},
+		allowPositionals: false,
+	});
+
+	const maxAgeDays = values["max-age"] !== undefined ? parseInt(values["max-age"], 10) : DEFAULT_MAX_AGE_DAYS;
+	if (isNaN(maxAgeDays) || maxAgeDays < 0) {
+		console.error(formatError("Invalid --max-age value", "Must be a non-negative integer"));
+		process.exit(2);
+	}
+
+	const maxEntries = values["max-entries"] !== undefined ? parseInt(values["max-entries"], 10) : DEFAULT_MAX_ENTRIES;
+	if (isNaN(maxEntries) || maxEntries < 0) {
+		console.error(formatError("Invalid --max-entries value", "Must be a non-negative integer"));
+		process.exit(2);
+	}
+
+	const options = {
+		maxAgeDays,
+		maxEntries,
+		dryRun: values["dry-run"] ?? false,
+	};
+
+	const repo = new TaskRepository();
+	const taskService = new TaskService(repo);
+
+	let results;
+	if (name) {
+		// Validate task exists
+		const task = await taskService.get(name);
+		const logPath = getLogPath(task.name);
+		const result = await rotateLogFile(task.name, logPath, options);
+		results = [result];
+	} else {
+		const tasks = await taskService.list();
+		results = await rotateAllLogs(tasks, options);
+	}
+
+	if (values.json) {
+		const totalRemoved = results.reduce((sum, r) => sum + r.entriesRemoved, 0);
+		console.log(JSON.stringify({ tasks: results, totalRemoved }, null, "\t"));
+		return;
+	}
+
+	console.log(formatRotationSummary(results, options.dryRun));
+}
+
 const QUERY_SUBCOMMANDS: Record<string, (args: string[], service: TaskService) => Promise<void>> = {
 	list: handleList,
 	get: handleGet,
@@ -611,6 +671,7 @@ const STANDALONE_COMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 	sync: handleSync,
 	doctor: handleDoctor,
 	import: handleImport,
+	rotate: handleRotate,
 };
 
 /**
@@ -637,6 +698,7 @@ export async function runCli(argv: string[]): Promise<void> {
 		console.log("  sync [--dry-run] [--clear]                                    Sync tasks to crontab");
 		console.log("  doctor [name] [--json]                                         Diagnose task issues");
 		console.log("  import [--dry-run] [--prefix <name>]                              Import crontab entries");
+	console.log("  rotate [name] [--max-age <days>] [--max-entries <N>] [--dry-run] [--json]  Rotate execution logs");
 		return;
 	}
 

@@ -13,7 +13,7 @@
 | 4 | 008-failure-notifications | Done | feature/008-failure-notifications | 2026-03-30 | 2026-03-30 |
 | 5 | 009-task-pause-resume | Done | feature/009-task-pause-resume | 2026-03-30 | 2026-03-30 |
 | 6 | 010-task-diagnosis | Done | feature/010-task-diagnosis | 2026-03-30 | 2026-03-30 |
-| 7 | 011-import-existing-crontab | In Progress | feature/011-import-existing-crontab | 2026-03-30 | — |
-| 8 | 012-log-rotation | Pending | — | — | — |
+| 7 | 011-import-existing-crontab | Done | feature/011-import-existing-crontab | 2026-03-30 | 2026-03-30 |
+| 8 | 012-log-rotation | Done | feature/012-log-rotation | 2026-03-30 | 2026-03-30 |
 | 9 | 013-task-groups-tags | Pending | — | — | — |
 | 10 | 014-dry-run-mode | Pending | — | — | — |
