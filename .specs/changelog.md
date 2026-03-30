@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-03-30 — Feature: Execution History implemented
+
+- **Type:** Feature Implemented
+- **Feature:** [007-execution-history](features/007-execution-history/implementation.md) — 223 tests total (all pass), 13 AC, 10 FR
+- **Author:** tool (spec.feature --auto)
+
+---
+
 ## 2026-03-30 — Feature: Task Listing & Status implemented
 
 - **Type:** Feature Implemented

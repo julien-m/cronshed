@@ -29,7 +29,8 @@ import { getDataDir } from "../app/config";
 import { getNextExecution } from "../cron/cron.service";
 import { getLastExecution } from "../log/log.service";
 import type { Task, EnrichedTask } from "../task/task.types";
-import { formatTaskTable, formatTaskDetails, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff } from "./cli.formatter";
+import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff } from "./cli.formatter";
+import { getExecutionHistory } from "../log/log.service";
 
 // @spec FR-022: Sync handler, FR-024: Dry-run display, FR-027: Error handling — .specs/features/003-crontab-sync/spec.md#fr-022
 async function handleSync(args: string[]): Promise<void> {
@@ -344,9 +345,68 @@ async function enrichTasks(tasks: Task[]): Promise<EnrichedTask[]> {
 	return Promise.all(tasks.map((task) => enrichTask(task)));
 }
 
+// @spec FR-003: History handler, FR-006: Command registration, FR-008: --limit flag, FR-009: Task validation, FR-010: No history message — .specs/features/007-execution-history/spec.md#fr-003
+/** Default number of history entries to display. */
+const DEFAULT_HISTORY_LIMIT = 10;
+
+async function handleHistory(args: string[], service: TaskService): Promise<void> {
+	const name = args[0];
+	if (!name) {
+		console.error(formatError("Missing task name", "Usage: cronshed history <name> [--limit N] [--json]"));
+		process.exit(2);
+	}
+
+	const restArgs = args.slice(1);
+	const { values } = parseArgs({
+		args: restArgs,
+		options: {
+			limit: { type: "string", short: "n" },
+			json: { type: "boolean", default: false },
+		},
+		allowPositionals: false,
+	});
+
+	const limit = values.limit !== undefined ? parseInt(values.limit, 10) : DEFAULT_HISTORY_LIMIT;
+	if (isNaN(limit) || limit < 0) {
+		console.error(formatError("Invalid --limit value", "Must be a non-negative integer"));
+		process.exit(2);
+	}
+
+	// Validate task exists before reading logs
+	await service.get(name);
+
+	const entries = await getExecutionHistory(name);
+
+	if (entries.length === 0) {
+		if (values.json) {
+			console.log(JSON.stringify([], null, "\t"));
+		} else {
+			console.log(`No execution history for ${name}`);
+		}
+		return;
+	}
+
+	// Reverse for most-recent-first, then apply limit
+	const reversed = entries.reverse();
+	const limited = limit === 0 ? [] : reversed.slice(0, limit);
+
+	if (values.json) {
+		console.log(JSON.stringify(limited, null, "\t"));
+		return;
+	}
+
+	if (limited.length === 0) {
+		console.log(`No execution history for ${name}`);
+		return;
+	}
+
+	console.log(formatHistoryTable(limited));
+}
+
 const QUERY_SUBCOMMANDS: Record<string, (args: string[], service: TaskService) => Promise<void>> = {
 	list: handleList,
 	get: handleGet,
+	history: handleHistory,
 };
 
 const MUTATION_SUBCOMMANDS: Record<string, (args: string[], service: TaskService, repo: TaskRepository) => Promise<void>> = {
@@ -378,6 +438,7 @@ export async function runCli(argv: string[]): Promise<void> {
 		console.log("  get <name> [--json]                                            Show task details");
 		console.log("  update <name> [--schedule '<cron>'] [--command '<cmd>'] [--no-sync]  Update a task");
 		console.log("  remove <name> [--no-sync]                                     Remove a task");
+		console.log("  history <name> [--limit N] [--json]                            Show execution history");
 		console.log("  sync [--dry-run] [--clear]                                    Sync tasks to crontab");
 		return;
 	}

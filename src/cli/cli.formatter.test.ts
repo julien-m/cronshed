@@ -1,6 +1,7 @@
 import { test, expect, describe } from "bun:test";
-import { formatTaskTable, formatTaskDetails, formatSuccess, formatError, formatWarning, formatSyncConfirmation } from "./cli.formatter";
+import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatDuration, formatSuccess, formatError, formatWarning, formatSyncConfirmation } from "./cli.formatter";
 import type { Task, EnrichedTask } from "../task/task.types";
+import type { ExecutionLogEntry } from "../log/log.types";
 
 const sampleTask: Task = {
 	id: "test-uuid-123",
@@ -176,5 +177,113 @@ describe("formatSyncConfirmation", () => {
 		const output = formatSyncConfirmation();
 		expect(output).toContain("\u2713");
 		expect(output).toContain("Synced to crontab");
+	});
+});
+
+const sampleHistoryEntry: ExecutionLogEntry = {
+	timestamp: "2026-03-30T02:00:05Z",
+	exitCode: 0,
+	durationMs: 1500,
+	stdout: "backup completed",
+	stderr: "",
+};
+
+describe("formatDuration", () => {
+	test("formats milliseconds", () => {
+		expect(formatDuration(0)).toBe("0ms");
+		expect(formatDuration(500)).toBe("500ms");
+		expect(formatDuration(999)).toBe("999ms");
+	});
+
+	test("formats seconds", () => {
+		expect(formatDuration(1000)).toBe("1s");
+		expect(formatDuration(1500)).toBe("1.5s");
+		expect(formatDuration(30000)).toBe("30s");
+	});
+
+	test("formats minutes and seconds", () => {
+		expect(formatDuration(60000)).toBe("1m");
+		expect(formatDuration(90000)).toBe("1m 30s");
+		expect(formatDuration(150000)).toBe("2m 30s");
+	});
+});
+
+describe("formatHistoryTable", () => {
+	// @spec AC-002: Each entry shows timestamp, exit code, duration, stdout/stderr
+
+	test("AC-002: displays table with correct headers", () => {
+		const output = formatHistoryTable([sampleHistoryEntry]);
+		expect(output).toContain("TIMESTAMP");
+		expect(output).toContain("EXIT CODE");
+		expect(output).toContain("DURATION");
+		expect(output).toContain("STDOUT");
+		expect(output).toContain("STDERR");
+	});
+
+	test("AC-002: displays entry data in the table", () => {
+		const output = formatHistoryTable([sampleHistoryEntry]);
+		expect(output).toContain("2026-03-30");
+		expect(output).toContain("backup completed");
+		expect(output).toContain("1.5s");
+	});
+
+	test("AC-003: exit code 0 is shown in green", () => {
+		const output = formatHistoryTable([sampleHistoryEntry]);
+		expect(output).toContain("\x1b[32m0\x1b[0m");
+	});
+
+	test("AC-003: non-zero exit code is shown in red", () => {
+		const failedEntry: ExecutionLogEntry = { ...sampleHistoryEntry, exitCode: 1 };
+		const output = formatHistoryTable([failedEntry]);
+		expect(output).toContain("\x1b[31m1\x1b[0m");
+	});
+
+	test("AC-002: multiple entries displayed correctly", () => {
+		const entries: ExecutionLogEntry[] = [
+			{ ...sampleHistoryEntry, timestamp: "2026-03-30T02:00:05Z" },
+			{ ...sampleHistoryEntry, timestamp: "2026-03-29T02:00:05Z", exitCode: 1, durationMs: 500 },
+		];
+		const output = formatHistoryTable(entries);
+		const lines = output.split("\n");
+		expect(lines).toHaveLength(3); // header + 2 data rows
+	});
+
+	test("FR-005: truncates stdout longer than 80 characters", () => {
+		const longEntry: ExecutionLogEntry = {
+			...sampleHistoryEntry,
+			stdout: "a".repeat(100),
+		};
+		const output = formatHistoryTable([longEntry]);
+		expect(output).toContain("a".repeat(80) + "...");
+		expect(output).not.toContain("a".repeat(100));
+	});
+
+	test("FR-005: truncates stderr longer than 80 characters", () => {
+		const longEntry: ExecutionLogEntry = {
+			...sampleHistoryEntry,
+			stderr: "e".repeat(100),
+		};
+		const output = formatHistoryTable([longEntry]);
+		expect(output).toContain("e".repeat(80) + "...");
+	});
+
+	test("FR-005: replaces newlines in stdout/stderr with spaces", () => {
+		const entry: ExecutionLogEntry = {
+			...sampleHistoryEntry,
+			stdout: "line1\nline2\nline3",
+		};
+		const output = formatHistoryTable([entry]);
+		expect(output).toContain("line1 line2 line3");
+		expect(output).not.toContain("\n" + "line2");
+	});
+
+	test("does not truncate output within 80 characters", () => {
+		const shortEntry: ExecutionLogEntry = {
+			...sampleHistoryEntry,
+			stdout: "short output",
+		};
+		const output = formatHistoryTable([shortEntry]);
+		expect(output).toContain("short output");
+		expect(output).not.toContain("...");
 	});
 });
