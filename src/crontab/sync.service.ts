@@ -4,6 +4,7 @@ import type { Task } from "../task/task.types";
 import type { TaskRepository } from "../task/task.repository";
 import type { CrontabEntry } from "./crontab.types";
 import type { CrontabAdapter } from "./crontab.adapter";
+import type { WrapperService } from "../wrapper/wrapper.service";
 
 export interface SyncOptions {
 	dryRun?: boolean;
@@ -77,9 +78,11 @@ function computeDiff(tasks: Task[], entries: CrontabEntry[]): SyncDiffEntry[] {
 }
 
 export class SyncService {
+	// @spec FR-044: SyncService accepts optional WrapperService — .specs/features/005-wrapper-script-generation/spec.md#fr-044
 	constructor(
 		private readonly repo: TaskRepository,
 		private readonly adapter: CrontabAdapter,
+		private readonly wrapperService?: WrapperService,
 	) {}
 
 	/**
@@ -93,10 +96,24 @@ export class SyncService {
 		}
 
 		const manifest = await this.repo.load();
-		const crontab = await this.adapter.read();
 		const tasks = manifest.tasks;
 
-		const diff = computeDiff(tasks, crontab.entries);
+		// @spec FR-044: Regenerate wrappers before sync (skip on dry-run) — .specs/features/005-wrapper-script-generation/spec.md#fr-044
+		if (this.wrapperService && !options.dryRun) {
+			await this.wrapperService.syncWrappers(tasks);
+		}
+
+		// Build entries with wrapper paths when wrapperService is available
+		const crontabTasks = tasks.map((t) => ({
+			...t,
+			command: this.wrapperService
+				? this.wrapperService.getWrapperPath(t.name)
+				: t.command,
+		}));
+
+		const crontab = await this.adapter.read();
+
+		const diff = computeDiff(crontabTasks, crontab.entries);
 
 		const result: SyncResult = {
 			installed: diff.filter((d) => d.type === "install").length,
@@ -111,8 +128,8 @@ export class SyncService {
 			return result;
 		}
 
-		// Build new entries from manifest tasks
-		const newEntries: CrontabEntry[] = tasks.map((t) => ({
+		// Build new entries from manifest tasks (with wrapper paths if available)
+		const newEntries: CrontabEntry[] = crontabTasks.map((t) => ({
 			taskName: t.name,
 			schedule: t.schedule,
 			command: t.command,

@@ -1,5 +1,5 @@
 import { test, expect, describe, afterEach } from "bun:test";
-import { getDataDir, getTasksPath } from "./config";
+import { getDataDir, getTasksPath, getWrappersDir, getLogsDir, getWrapperPath, getLogPath } from "./config";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -27,5 +27,25 @@ describe("config", () => {
 	test("getTasksPath returns tasks.json in data dir", () => {
 		process.env["CRONSHED_HOME"] = "/tmp/test-dir";
 		expect(getTasksPath()).toBe("/tmp/test-dir/tasks.json");
+	});
+
+	test("getWrappersDir returns wrappers/ in data dir", () => {
+		process.env["CRONSHED_HOME"] = "/tmp/test-dir";
+		expect(getWrappersDir()).toBe("/tmp/test-dir/wrappers");
+	});
+
+	test("getLogsDir returns logs/ in data dir", () => {
+		process.env["CRONSHED_HOME"] = "/tmp/test-dir";
+		expect(getLogsDir()).toBe("/tmp/test-dir/logs");
+	});
+
+	test("getWrapperPath returns correct wrapper script path", () => {
+		process.env["CRONSHED_HOME"] = "/tmp/test-dir";
+		expect(getWrapperPath("backup-db")).toBe("/tmp/test-dir/wrappers/backup-db.sh");
+	});
+
+	test("getLogPath returns correct JSONL log path", () => {
+		process.env["CRONSHED_HOME"] = "/tmp/test-dir";
+		expect(getLogPath("backup-db")).toBe("/tmp/test-dir/logs/backup-db.jsonl");
 	});
 });

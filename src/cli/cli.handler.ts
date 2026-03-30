@@ -23,6 +23,9 @@ import {
 	CommandFileNotExecutableError,
 	CommandPathIsDirectoryError,
 } from "./command.errors";
+import { WrapperService } from "../wrapper/wrapper.service";
+import { WrapperGenerationError } from "../wrapper/wrapper.errors";
+import { getDataDir } from "../app/config";
 import { formatTaskTable, formatTaskDetails, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatSyncResult, formatSyncDiff } from "./cli.formatter";
 
 // @spec FR-022: Sync handler, FR-024: Dry-run display, FR-027: Error handling — .specs/features/003-crontab-sync/spec.md#fr-022
@@ -38,7 +41,8 @@ async function handleSync(args: string[]): Promise<void> {
 
 	const repo = new TaskRepository();
 	const adapter = new CrontabAdapter();
-	const syncService = new SyncService(repo, adapter);
+	const wrapperService = new WrapperService(getDataDir());
+	const syncService = new SyncService(repo, adapter, wrapperService);
 
 	const result = await syncService.sync({
 		dryRun: values["dry-run"],
@@ -54,10 +58,12 @@ async function handleSync(args: string[]): Promise<void> {
 }
 
 // @spec FR-029, FR-030, FR-031, FR-032, FR-033: Auto-sync after mutations — .specs/features/004-auto-sync/spec.md#fr-029
+// @spec FR-044: Auto-sync passes WrapperService — .specs/features/005-wrapper-script-generation/spec.md#fr-044
 async function autoSync(repo: TaskRepository): Promise<void> {
 	try {
 		const adapter = new CrontabAdapter();
-		const syncService = new SyncService(repo, adapter);
+		const wrapperService = new WrapperService(getDataDir());
+		const syncService = new SyncService(repo, adapter, wrapperService);
 		await syncService.sync();
 		console.log(formatSyncConfirmation());
 	} catch (error) {
@@ -82,7 +88,8 @@ function getExitCode(err: unknown): number {
 	}
 	if (
 		err instanceof ManifestCorruptedError || err instanceof ManifestVersionError || err instanceof ManifestAccessError ||
-		err instanceof CrontabReadError || err instanceof CrontabWriteError
+		err instanceof CrontabReadError || err instanceof CrontabWriteError ||
+		err instanceof WrapperGenerationError
 	) {
 		return 3;
 	}
@@ -119,6 +126,9 @@ function getErrorHint(err: unknown): string | undefined {
 	}
 	if (err instanceof CommandPathIsDirectoryError) {
 		return "Expected a file, not a directory";
+	}
+	if (err instanceof WrapperGenerationError) {
+		return "Check permissions for the wrappers directory";
 	}
 	return undefined;
 }
@@ -158,6 +168,10 @@ async function handleAdd(args: string[], service: TaskService, repo: TaskReposit
 		schedule: values.schedule,
 		command: resolution.resolved,
 	});
+
+	// @spec FR-042: Generate wrapper on add — .specs/features/005-wrapper-script-generation/spec.md#fr-042
+	const wrapperService = new WrapperService(getDataDir());
+	await wrapperService.generate(task);
 
 	if (resolution.isFilePath) {
 		console.log(formatSuccess(`Task ${task.name} created (command: ${resolution.resolved})`));
@@ -256,6 +270,13 @@ async function handleUpdate(args: string[], service: TaskService, repo: TaskRepo
 		schedule: values.schedule,
 		command: resolvedCommand,
 	});
+
+	// @spec FR-042: Regenerate wrapper only on command change — .specs/features/005-wrapper-script-generation/spec.md#fr-042
+	if (values.command) {
+		const wrapperService = new WrapperService(getDataDir());
+		await wrapperService.generate(task);
+	}
+
 	console.log(formatSuccess(`Task ${task.name} updated`));
 
 	if (!values["no-sync"]) {
@@ -280,6 +301,11 @@ async function handleRemove(args: string[], service: TaskService, repo: TaskRepo
 	});
 
 	await service.remove(name);
+
+	// @spec FR-043: Delete wrapper on remove — .specs/features/005-wrapper-script-generation/spec.md#fr-043
+	const wrapperService = new WrapperService(getDataDir());
+	await wrapperService.remove(name);
+
 	console.log(formatSuccess(`Task ${name} removed`));
 
 	if (!values["no-sync"]) {

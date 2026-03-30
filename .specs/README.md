@@ -2,7 +2,7 @@
 
 > Specification registry for Cronshed. All artifacts produced by LiveSpec are indexed here.
 >
-> Last updated: 2026-03-30 (004-auto-sync)
+> Last updated: 2026-03-30 (005-wrapper-script-generation)
 
 ---
 
@@ -38,6 +38,7 @@
 | 002 | Command Path Resolution | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/002-command-path-resolution/spec.md) |
 | 003 | Crontab Sync | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/003-crontab-sync/spec.md) |
 | 004 | Auto-Sync | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/004-auto-sync/spec.md) |
+| 005 | Wrapper Script Generation | Implemented | 2026-03-30 | 2026-03-30 | [spec](features/005-wrapper-script-generation/spec.md) |
 <!-- readme:features:end -->
 
 ---
@@ -60,6 +61,7 @@
 <!-- readme:activity:start -->
 | Date | Type | Description |
 |---|---|---|
+| 2026-03-30 | Feature | [005] Implemented: Wrapper Script Generation — 6 stories, 13 AC, 11 FR, 39 tests |
 | 2026-03-30 | Feature | [004] Implemented: Auto-Sync — 4 stories, 8 AC, 7 FR, 131 tests |
 | 2026-03-30 | Feature | [003] Implemented: Crontab Sync — 3 stories, 12 AC, 9 FR, 31 tests |
 | 2026-03-30 | Spec | [001] Spec created: Task Manifest & CRUD — 5 stories, 15 AC, 8 FR |
