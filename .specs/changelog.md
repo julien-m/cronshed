@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-03-31 — Check: Full spec-code alignment verified (all 14 features)
+
+- **Type:** Spec Check
+- **Coverage:** 316/322 verified (98.1%), 6 partial (missing @spec anchors), 0 missing
+- **Tests:** 447 passing, 0 failing
+- **Features checked:** 001-014 (all)
+- **Reports:** `features/*/checks/2026-03-31.md`
+- **Author:** tool (spec.check --all)
+
+---
+
 ## 2026-03-30 — Feature: Dry-run Mode implemented
 
 - **Type:** Feature Implemented
