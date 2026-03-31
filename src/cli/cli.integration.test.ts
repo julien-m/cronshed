@@ -111,6 +111,20 @@ describe("cronshed get", () => {
 		expect(parsed.name).toBe("my-task");
 	});
 
+	// @spec AC-074: get --json includes notify field — .specs/features/008-failure-notifications/spec.md#ac-074
+	test("AC-074: get --json includes notify field", async () => {
+		await run("add", "my-task", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
+		const { stdout } = await run("get", "my-task", "--json");
+		const parsed = JSON.parse(stdout);
+		expect(parsed).toHaveProperty("notify");
+		expect(parsed.notify).toBe(false);
+
+		await run("update", "my-task", "--notify", "--no-sync");
+		const { stdout: stdout2 } = await run("get", "my-task", "--json");
+		const parsed2 = JSON.parse(stdout2);
+		expect(parsed2.notify).toBe(true);
+	});
+
 	test("throws for non-existent task with exit code 1", async () => {
 		const { stderr, exitCode } = await run("get", "ghost");
 		expect(exitCode).toBe(1);

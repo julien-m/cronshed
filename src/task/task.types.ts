@@ -1,6 +1,6 @@
 // @spec FR-002: Task entity definition — .specs/features/001-task-manifest/spec.md#fr-002
 
-// @spec FR-047: Task entity with notify field — .specs/features/008-failure-notifications/spec.md#fr-047
+// @spec FR-047: Task entity with notify field, FR-055: JSON includes notify — .specs/features/008-failure-notifications/spec.md#fr-047
 // @spec FR-055: Status expanded to active|paused — .specs/features/009-task-pause-resume/spec.md#fr-055
 // @spec FR-001: Tags field on Task — .specs/features/013-task-groups-tags/spec.md#fr-001
 export interface Task {

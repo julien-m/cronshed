@@ -18,7 +18,7 @@
 | FR-052 | `src/cli/cli.handler.ts` | `@spec FR-052` | ✅ Implemented | 2026-03-30 |
 | FR-053 | `src/crontab/sync.service.ts`, `src/wrapper/wrapper.service.ts` | `@spec FR-053` | ✅ Implemented | 2026-03-30 |
 | FR-054 | `src/cli/cli.formatter.ts` | `@spec FR-054` | ✅ Implemented | 2026-03-30 |
-| FR-055 | (automatic via JSON.stringify) | — | ✅ Implemented | 2026-03-30 |
+| FR-055 | `src/task/task.types.ts` (notify on Task interface) | `@spec FR-055` | ✅ Implemented | 2026-03-31 |
 
 ## Acceptance Criteria Mapping
 
@@ -35,7 +35,7 @@
 | AC-071 | `src/wrapper/wrapper.service.test.ts` | ✅ |
 | AC-072 | `src/crontab/sync.service.test.ts` | ✅ |
 | AC-073 | `src/cli/cli.formatter.test.ts` | ✅ |
-| AC-074 | (automatic via JSON.stringify) | ✅ |
+| AC-074 | `src/cli/cli.integration.test.ts` | ✅ |
 
 ## Files Created/Modified
 

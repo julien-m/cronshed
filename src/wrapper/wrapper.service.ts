@@ -143,7 +143,7 @@ export class WrapperService {
 	 * Remove a wrapper script for a task. No-op if file does not exist.
 	 * @param taskName The task name
 	 */
-	// @spec FR-040: Silent removal — .specs/features/005-wrapper-script-generation/spec.md#fr-040
+	// @spec FR-040: Silent removal, FR-046: Log files preserved — .specs/features/005-wrapper-script-generation/spec.md#fr-040
 	async remove(taskName: string): Promise<void> {
 		const wrapperPath = this.getWrapperPath(taskName);
 		try {

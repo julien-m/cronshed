@@ -21,7 +21,7 @@
 | FR-070 | `src/cli/cli.formatter.ts` | `@spec FR-070` | ✅ Implemented | 2026-03-30 |
 | FR-071 | `src/cli/cli.handler.ts` | `@spec FR-069` | ✅ Implemented | 2026-03-30 |
 | FR-072 | `src/cli/cli.handler.ts` | `@spec FR-069` | ✅ Implemented | 2026-03-30 |
-| FR-073 | `src/cli/cli.handler.ts` | `@spec FR-073` | ✅ Implemented | 2026-03-30 |
+| FR-073 | `src/cli/cli.handler.ts` | `@spec FR-073` | ✅ Implemented | 2026-03-31 |
 
 ---
 

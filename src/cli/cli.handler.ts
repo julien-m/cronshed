@@ -146,11 +146,13 @@ export async function runCli(argv: string[]): Promise<void> {
 		console.log("  get <name> [--json]                                                                          Show task details");
 		console.log("  update <name> [--schedule] [--command] [--notify|--no-notify] [--tag]... [--untag]... [--no-sync]  Update a task");
 		console.log("  remove <name> [--no-sync]                                                                    Remove a task");
+		// @spec FR-062: Help text for pause/resume — .specs/features/009-task-pause-resume/spec.md#fr-062
 		console.log("  pause <name> [--no-sync]                                                                     Pause a task");
 		console.log("  resume <name> [--no-sync]                                                                    Resume a paused task");
 		console.log("  history <name> [--limit N] [--json]                                                          Show execution history");
 		console.log("  tags [--json]                                                                                 List all tags");
 		console.log("  sync [--dry-run] [--clear]                                                                    Sync tasks to crontab");
+		// @spec FR-073: Help text for doctor — .specs/features/010-task-diagnosis/spec.md#fr-073
 		console.log("  doctor [name] [--json]                                                                        Diagnose task issues");
 		console.log("  import [--dry-run] [--prefix <name>]                                                          Import crontab entries");
 		console.log("  rotate [name] [--max-age <days>] [--max-entries <N>] [--dry-run] [--json]                     Rotate execution logs");

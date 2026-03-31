@@ -16,7 +16,7 @@
 | FR-059 | `src/crontab/sync.service.ts` | `@spec FR-059` | ✅ Implemented | 2026-03-30 |
 | FR-060 | `src/cli/cli.handler.ts` | `@spec FR-060` | ✅ Implemented | 2026-03-30 |
 | FR-061 | `src/task/task.errors.ts` | `@spec FR-061` | ✅ Implemented | 2026-03-30 |
-| FR-062 | `src/cli/cli.handler.ts` | `@spec FR-058` | ✅ Implemented | 2026-03-30 |
+| FR-062 | `src/cli/cli.handler.ts` | `@spec FR-062` | ✅ Implemented | 2026-03-31 |
 
 ---
 

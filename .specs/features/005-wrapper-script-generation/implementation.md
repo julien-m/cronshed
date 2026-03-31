@@ -14,7 +14,7 @@
 | FR-043 | `src/cli/cli.handler.ts` | `@spec FR-043` | Implemented | 2026-03-30 |
 | FR-044 | `src/crontab/sync.service.ts`, `src/cli/cli.handler.ts` | `@spec FR-044` | Implemented | 2026-03-30 |
 | FR-045 | `src/app/config.ts`, `src/wrapper/wrapper.service.ts` (script body) | `@spec FR-045` | Implemented | 2026-03-30 |
-| FR-046 | `src/wrapper/wrapper.service.ts` (remove only deletes wrapper) | `@spec FR-046` | Implemented | 2026-03-30 |
+| FR-046 | `src/wrapper/wrapper.service.ts` (remove only deletes wrapper) | `@spec FR-046` | ✅ Implemented | 2026-03-31 |
 
 ## Acceptance Criteria Mapping
 

@@ -236,7 +236,7 @@ export async function handleRotate(args: string[]): Promise<void> {
 	console.log(formatRotationSummary(results, options.dryRun));
 }
 
-// @spec FR-001: Run handler, FR-002: Task lookup, FR-003: Wrapper auto-gen, FR-004: Output streaming, FR-005: Exit code capture, FR-007: JSON output, FR-008: Exit code propagation, FR-009: Usage error — .specs/features/014-dry-run-mode/spec.md#fr-001
+// @spec FR-001: Run handler, FR-002: Task lookup, FR-003: Wrapper auto-gen, FR-004: Output streaming, FR-005: Exit code capture, FR-007: JSON output, FR-008: Exit code propagation, FR-009: Usage error, FR-011: Delegates logging to wrapper — .specs/features/014-dry-run-mode/spec.md#fr-001
 export async function handleRun(args: string[]): Promise<void> {
 	const name = args[0] && !args[0].startsWith("--") ? args[0] : undefined;
 	const restArgs = name ? args.slice(1) : args;

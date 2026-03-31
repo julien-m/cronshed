@@ -19,7 +19,7 @@
 | FR-008 | `src/cli/cli.handler.ts` | `@spec FR-008: Exit code propagation — .specs/features/014-dry-run-mode/spec.md#fr-008` | ✅ Implemented | 2026-03-30 |
 | FR-009 | `src/cli/cli.handler.ts` | `@spec FR-009: Usage error — .specs/features/014-dry-run-mode/spec.md#fr-009` | ✅ Implemented | 2026-03-30 |
 | FR-010 | `src/cli/cli.handler.ts` | `@spec FR-010: Register run command — .specs/features/014-dry-run-mode/spec.md#fr-010` | ✅ Implemented | 2026-03-30 |
-| FR-011 | `src/cli/run.test.ts` | (verified via AC-009 test) | ✅ Implemented | 2026-03-30 |
+| FR-011 | `src/cli/handlers/ops.handler.ts` | `@spec FR-011` | ✅ Implemented | 2026-03-31 |
 
 ## Acceptance Criteria Mapping
 
