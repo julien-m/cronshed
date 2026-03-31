@@ -26,7 +26,7 @@ import {
 	formatRotationSummary,
 	formatRunSummary,
 } from "../formatters/ops.formatter";
-import { autoSync } from "./task-crud.handler";
+import { autoSync } from "./shared";
 
 // @spec FR-022: Sync handler, FR-024: Dry-run display, FR-027: Error handling — .specs/features/003-crontab-sync/spec.md#fr-022
 export async function handleSync(args: string[]): Promise<void> {

@@ -141,20 +141,20 @@ export async function runCli(argv: string[]): Promise<void> {
 		console.log("");
 		console.log("Commands:");
 		// @spec FR-015: Help text with tag flags — .specs/features/013-task-groups-tags/spec.md#fr-015
-		console.log("  add <name> --schedule '<cron>' --command '<cmd>' [--notify] [--tag <tag>]... [--no-sync]");
-		console.log("  list [--tag <tag>] [--json]");
-		console.log("  get <name> [--json]");
-		console.log("  update <name> [--schedule '<cron>'] [--command '<cmd>'] [--notify|--no-notify] [--tag <tag>]... [--untag <tag>]... [--no-sync]");
-		console.log("  remove <name> [--no-sync]");
-		console.log("  pause <name> [--no-sync]");
-		console.log("  resume <name> [--no-sync]");
-		console.log("  history <name> [--limit N] [--json]");
-		console.log("  tags [--json]");
-		console.log("  sync [--dry-run] [--clear]");
-		console.log("  doctor [name] [--json]");
-		console.log("  import [--dry-run] [--prefix <name>]");
-		console.log("  rotate [name] [--max-age <days>] [--max-entries <N>] [--dry-run] [--json]");
-		console.log("  run <name> [--json]");
+		console.log("  add <name> --schedule '<cron>' --command '<cmd>' [--notify] [--tag <tag>]... [--no-sync]   Add a task");
+		console.log("  list [--tag <tag>] [--json]                                                                  List all tasks");
+		console.log("  get <name> [--json]                                                                          Show task details");
+		console.log("  update <name> [--schedule] [--command] [--notify|--no-notify] [--tag]... [--untag]... [--no-sync]  Update a task");
+		console.log("  remove <name> [--no-sync]                                                                    Remove a task");
+		console.log("  pause <name> [--no-sync]                                                                     Pause a task");
+		console.log("  resume <name> [--no-sync]                                                                    Resume a paused task");
+		console.log("  history <name> [--limit N] [--json]                                                          Show execution history");
+		console.log("  tags [--json]                                                                                 List all tags");
+		console.log("  sync [--dry-run] [--clear]                                                                    Sync tasks to crontab");
+		console.log("  doctor [name] [--json]                                                                        Diagnose task issues");
+		console.log("  import [--dry-run] [--prefix <name>]                                                          Import crontab entries");
+		console.log("  rotate [name] [--max-age <days>] [--max-entries <N>] [--dry-run] [--json]                     Rotate execution logs");
+		console.log("  run <name> [--json]                                                                           Run a task immediately");
 		return;
 	}
 
