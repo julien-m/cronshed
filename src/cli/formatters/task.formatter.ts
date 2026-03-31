@@ -80,8 +80,8 @@ export function formatTaskDetails(task: EnrichedTask): string {
 		lines.push(`Last run:   ${formatTimestamp(task.lastRun)}`);
 		if (task.lastExitCode !== null) {
 			const exitCodeStr = task.lastExitCode === 0
-				? `${ANSI_GREEN}${task.lastExitCode}${ANSI_RESET}`
-				: `${ANSI_RED}${task.lastExitCode}${ANSI_RESET}`;
+				? `${ANSI_GREEN()}${task.lastExitCode}${ANSI_RESET()}`
+				: `${ANSI_RED()}${task.lastExitCode}${ANSI_RESET()}`;
 			lines.push(`Exit code:  ${exitCodeStr}`);
 		}
 	} else {

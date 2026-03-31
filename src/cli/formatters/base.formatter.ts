@@ -1,13 +1,16 @@
 // Shared ANSI helpers, utility formatters, and feedback primitives.
 
-// ANSI color codes for terminal output (convention: signal/noise maximal, colors for semantic meaning)
-// Respects NO_COLOR environment variable per spec: colors disabled only when NO_COLOR is set AND non-empty
+// ANSI color helpers — evaluated at call time so tests can control NO_COLOR dynamically.
+// A module-level constant would be frozen at import time, making it untestable.
 // @see https://no-color.org/
-export const SUPPORTS_COLOR = process.env.NO_COLOR === undefined || process.env.NO_COLOR === "";
-export const ANSI_GREEN = SUPPORTS_COLOR ? "\x1b[32m" : "";
-export const ANSI_RED = SUPPORTS_COLOR ? "\x1b[31m" : "";
-export const ANSI_YELLOW = SUPPORTS_COLOR ? "\x1b[33m" : "";
-export const ANSI_RESET = SUPPORTS_COLOR ? "\x1b[0m" : "";
+export function supportsColor(): boolean {
+	return process.env.NO_COLOR === undefined || process.env.NO_COLOR === "";
+}
+
+export function ANSI_GREEN(): string { return supportsColor() ? "\x1b[32m" : ""; }
+export function ANSI_RED(): string { return supportsColor() ? "\x1b[31m" : ""; }
+export function ANSI_YELLOW(): string { return supportsColor() ? "\x1b[33m" : ""; }
+export function ANSI_RESET(): string { return supportsColor() ? "\x1b[0m" : ""; }
 
 /**
  * Format a success message prefixed with ✓ in green.
@@ -15,7 +18,7 @@ export const ANSI_RESET = SUPPORTS_COLOR ? "\x1b[0m" : "";
  * @returns Formatted success string with green checkmark prefix
  */
 export function formatSuccess(message: string): string {
-	return `${ANSI_GREEN}\u2713${ANSI_RESET} ${message}`;
+	return `${ANSI_GREEN()}\u2713${ANSI_RESET()} ${message}`;
 }
 
 /**
@@ -24,9 +27,9 @@ export function formatSuccess(message: string): string {
  * @param hint Optional suggestion line prefixed with →
  */
 export function formatError(message: string, hint?: string): string {
-	let output = `${ANSI_RED}\u2717${ANSI_RESET} Error: ${message}`;
+	let output = `${ANSI_RED()}\u2717${ANSI_RESET()} Error: ${message}`;
 	if (hint) {
-		output += `\n${ANSI_RED}\u2192${ANSI_RESET} ${hint}`;
+		output += `\n${ANSI_RED()}\u2192${ANSI_RESET()} ${hint}`;
 	}
 	return output;
 }
@@ -38,9 +41,9 @@ export function formatError(message: string, hint?: string): string {
  */
 // @spec FR-032: Non-fatal auto-sync warning — .specs/features/004-auto-sync/spec.md#fr-032
 export function formatWarning(message: string, hint?: string): string {
-	let output = `${ANSI_YELLOW}\u26A0${ANSI_RESET} Warning: ${message}`;
+	let output = `${ANSI_YELLOW()}\u26A0${ANSI_RESET()} Warning: ${message}`;
 	if (hint) {
-		output += `\n${ANSI_YELLOW}\u2192${ANSI_RESET} ${hint}`;
+		output += `\n${ANSI_YELLOW()}\u2192${ANSI_RESET()} ${hint}`;
 	}
 	return output;
 }
@@ -107,9 +110,9 @@ export function truncateOutput(str: string, maxLen: number): string {
  */
 export function formatExitCode(exitCode: number): string {
 	if (exitCode === 0) {
-		return `${ANSI_GREEN}${exitCode}${ANSI_RESET}`;
+		return `${ANSI_GREEN()}${exitCode}${ANSI_RESET()}`;
 	}
-	return `${ANSI_RED}${exitCode}${ANSI_RESET}`;
+	return `${ANSI_RED()}${exitCode}${ANSI_RESET()}`;
 }
 
 /**

@@ -89,15 +89,15 @@ export function formatDiagnosisReport(results: DiagnosisResult[]): string {
 
 	for (const result of results) {
 		if (result.status === "ok") {
-			lines.push(`${ANSI_GREEN}\u2713${ANSI_RESET} ${result.taskName}`);
+			lines.push(`${ANSI_GREEN()}\u2713${ANSI_RESET()} ${result.taskName}`);
 		} else {
-			lines.push(`${ANSI_RED}\u2717${ANSI_RESET} ${result.taskName}`);
+			lines.push(`${ANSI_RED()}\u2717${ANSI_RESET()} ${result.taskName}`);
 			for (const issue of result.issues) {
-				const color = issue.severity === "error" ? ANSI_RED : ANSI_YELLOW;
+				const color = issue.severity === "error" ? ANSI_RED() : ANSI_YELLOW();
 				const prefix = issue.severity === "error" ? "  \u2717" : "  \u26A0";
-				lines.push(`${color}${prefix}${ANSI_RESET} ${issue.message}`);
+				lines.push(`${color}${prefix}${ANSI_RESET()} ${issue.message}`);
 				if (issue.hint) {
-					lines.push(`${color}    \u2192${ANSI_RESET} ${issue.hint}`);
+					lines.push(`${color}    \u2192${ANSI_RESET()} ${issue.hint}`);
 				}
 			}
 		}
@@ -222,9 +222,9 @@ export function formatRotationSummary(results: RotationResult[], dryRun: boolean
  */
 export function formatRunSummary(taskName: string, exitCode: number, durationMs: number): string {
 	if (exitCode === 0) {
-		return `${ANSI_GREEN}\u2713${ANSI_RESET} ${taskName} completed (exit 0) in ${formatDuration(durationMs)}`;
+		return `${ANSI_GREEN()}\u2713${ANSI_RESET()} ${taskName} completed (exit 0) in ${formatDuration(durationMs)}`;
 	}
-	return `${ANSI_RED}\u2717${ANSI_RESET} ${taskName} failed (exit ${exitCode}) in ${formatDuration(durationMs)}`;
+	return `${ANSI_RED()}\u2717${ANSI_RESET()} ${taskName} failed (exit ${exitCode}) in ${formatDuration(durationMs)}`;
 }
 
 /**
