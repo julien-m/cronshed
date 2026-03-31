@@ -488,7 +488,7 @@ async function handleHistory(args: string[], service: TaskService): Promise<void
 	}
 
 	// Reverse for most-recent-first, then apply limit
-	const reversed = entries.reverse();
+	const reversed = entries.toReversed();
 	const limited = limit === 0 ? [] : reversed.slice(0, limit);
 
 	if (values.json) {

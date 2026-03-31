@@ -159,7 +159,7 @@ export class TaskService {
 
 		// @spec FR-005: Apply tag additions and removals — .specs/features/013-task-groups-tags/spec.md#fr-005
 		if (hasTags || hasUntags) {
-			let currentTags = new Set(task.tags);
+			const currentTags = new Set(task.tags);
 			if (hasTags) {
 				for (const tag of input.tags!) {
 					currentTags.add(tag);

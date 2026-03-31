@@ -74,7 +74,7 @@ describe("resolveCommand", () => {
 
 	test("AC-024: throws CommandFileNotFoundError for non-existent file", async () => {
 		const missing = join(tmpDir, "missing.sh");
-		expect(resolveCommand(missing)).rejects.toThrow(CommandFileNotFoundError);
+		await expect(resolveCommand(missing)).rejects.toThrow(CommandFileNotFoundError);
 	});
 
 	test("AC-025: throws CommandFileNotExecutableError for non-executable file", async () => {
@@ -82,7 +82,7 @@ describe("resolveCommand", () => {
 		await writeFile(script, "#!/bin/sh\necho hi");
 		await chmod(script, 0o644);
 
-		expect(resolveCommand(script)).rejects.toThrow(CommandFileNotExecutableError);
+		await expect(resolveCommand(script)).rejects.toThrow(CommandFileNotExecutableError);
 	});
 
 	test("AC-026: inline command passes through without validation", async () => {
@@ -111,7 +111,7 @@ describe("resolveCommand", () => {
 		const dir = join(tmpDir, "scripts");
 		await mkdir(dir);
 
-		expect(resolveCommand(dir)).rejects.toThrow(CommandPathIsDirectoryError);
+		await expect(resolveCommand(dir)).rejects.toThrow(CommandPathIsDirectoryError);
 	});
 
 	test("edge case 4: path with spaces works correctly", async () => {

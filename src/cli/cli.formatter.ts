@@ -3,7 +3,7 @@
 // @spec FR-070: Diagnosis report formatting — .specs/features/010-task-diagnosis/spec.md#fr-070
 // @spec FR-007: Rotation summary formatting — .specs/features/012-log-rotation/spec.md#fr-007
 
-import type { Task, EnrichedTask } from "../task/task.types";
+import type { EnrichedTask } from "../task/task.types";
 import type { SyncResult, SyncDiffEntry } from "../crontab/sync.service";
 import type { ExecutionLogEntry } from "../log/log.types";
 import type { DiagnosisResult } from "../diagnosis/diagnosis.types";

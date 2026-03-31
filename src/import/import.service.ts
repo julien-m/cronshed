@@ -1,7 +1,6 @@
 // @spec FR-075: ImportService class, FR-076: parseUserLine, FR-077: generateTaskName, FR-078: resolveNameConflict — .specs/features/011-import-existing-crontab/spec.md#fr-075
 
 import { validateCronExpression } from "../cron/cron.service";
-import { InvalidCronExpressionError } from "../cron/cron.errors";
 import { TASK_NAME_REGEX } from "../task/task.types";
 import type { ImportOptions, ImportResult, ImportedEntry, SkippedEntry } from "./import.types";
 

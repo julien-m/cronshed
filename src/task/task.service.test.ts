@@ -46,22 +46,22 @@ describe("TaskService.add", () => {
 
 	test("AC-003: rejects duplicate task names", async () => {
 		await service.add({ name: "my-task", schedule: "0 0 * * *", command: "echo hi" });
-		expect(service.add({ name: "my-task", schedule: "0 1 * * *", command: "echo dup" })).rejects.toThrow(DuplicateTaskNameError);
+		await expect(service.add({ name: "my-task", schedule: "0 1 * * *", command: "echo dup" })).rejects.toThrow(DuplicateTaskNameError);
 	});
 
 	test("AC-002: rejects invalid cron expressions", async () => {
-		expect(service.add({ name: "bad-cron", schedule: "bad", command: "echo hi" })).rejects.toThrow(InvalidCronExpressionError);
+		await expect(service.add({ name: "bad-cron", schedule: "bad", command: "echo hi" })).rejects.toThrow(InvalidCronExpressionError);
 	});
 
 	test("rejects invalid task names", async () => {
-		expect(service.add({ name: "BAD NAME", schedule: "0 0 * * *", command: "echo hi" })).rejects.toThrow(InvalidTaskNameError);
-		expect(service.add({ name: "bad_name", schedule: "0 0 * * *", command: "echo hi" })).rejects.toThrow(InvalidTaskNameError);
-		expect(service.add({ name: "-leading", schedule: "0 0 * * *", command: "echo hi" })).rejects.toThrow(InvalidTaskNameError);
+		await expect(service.add({ name: "BAD NAME", schedule: "0 0 * * *", command: "echo hi" })).rejects.toThrow(InvalidTaskNameError);
+		await expect(service.add({ name: "bad_name", schedule: "0 0 * * *", command: "echo hi" })).rejects.toThrow(InvalidTaskNameError);
+		await expect(service.add({ name: "-leading", schedule: "0 0 * * *", command: "echo hi" })).rejects.toThrow(InvalidTaskNameError);
 	});
 
 	test("rejects empty command", async () => {
-		expect(service.add({ name: "empty-cmd", schedule: "0 0 * * *", command: "" })).rejects.toThrow(EmptyCommandError);
-		expect(service.add({ name: "space-cmd", schedule: "0 0 * * *", command: "   " })).rejects.toThrow(EmptyCommandError);
+		await expect(service.add({ name: "empty-cmd", schedule: "0 0 * * *", command: "" })).rejects.toThrow(EmptyCommandError);
+		await expect(service.add({ name: "space-cmd", schedule: "0 0 * * *", command: "   " })).rejects.toThrow(EmptyCommandError);
 	});
 
 	// @spec FR-047: Default notify to false — .specs/features/008-failure-notifications/spec.md#fr-047
@@ -128,7 +128,7 @@ describe("TaskService.get", () => {
 	});
 
 	test("AC-009: throws for non-existent task", async () => {
-		expect(service.get("ghost")).rejects.toThrow(TaskNotFoundError);
+		await expect(service.get("ghost")).rejects.toThrow(TaskNotFoundError);
 	});
 });
 
@@ -149,21 +149,21 @@ describe("TaskService.update", () => {
 
 	test("AC-011: rejects invalid cron on update", async () => {
 		await service.add({ name: "my-task", schedule: "0 2 * * *", command: "echo hi" });
-		expect(service.update("my-task", { schedule: "bad" })).rejects.toThrow(InvalidCronExpressionError);
+		await expect(service.update("my-task", { schedule: "bad" })).rejects.toThrow(InvalidCronExpressionError);
 	});
 
 	test("AC-011: rejects empty command on update", async () => {
 		await service.add({ name: "my-task", schedule: "0 2 * * *", command: "echo hi" });
-		expect(service.update("my-task", { command: "" })).rejects.toThrow(EmptyCommandError);
+		await expect(service.update("my-task", { command: "" })).rejects.toThrow(EmptyCommandError);
 	});
 
 	test("AC-012: rejects update with no changes", async () => {
 		await service.add({ name: "my-task", schedule: "0 2 * * *", command: "echo hi" });
-		expect(service.update("my-task", {})).rejects.toThrow("No changes specified");
+		await expect(service.update("my-task", {})).rejects.toThrow("No changes specified");
 	});
 
 	test("throws for non-existent task", async () => {
-		expect(service.update("ghost", { schedule: "0 0 * * *" })).rejects.toThrow(TaskNotFoundError);
+		await expect(service.update("ghost", { schedule: "0 0 * * *" })).rejects.toThrow(TaskNotFoundError);
 	});
 
 	// @spec FR-047: Update notify field — .specs/features/008-failure-notifications/spec.md#fr-047
@@ -190,7 +190,7 @@ describe("TaskService.remove", () => {
 	});
 
 	test("AC-009: throws for non-existent task", async () => {
-		expect(service.remove("ghost")).rejects.toThrow(TaskNotFoundError);
+		await expect(service.remove("ghost")).rejects.toThrow(TaskNotFoundError);
 	});
 
 	test("AC-019: removing last task leaves empty manifest", async () => {
@@ -224,13 +224,13 @@ describe("TaskService.pause", () => {
 	});
 
 	test("AC-007: throws TaskNotFoundError for non-existent task", async () => {
-		expect(service.pause("ghost")).rejects.toThrow(TaskNotFoundError);
+		await expect(service.pause("ghost")).rejects.toThrow(TaskNotFoundError);
 	});
 
 	test("AC-005: throws TaskAlreadyPausedError for already-paused task", async () => {
 		await service.add({ name: "daily-backup", schedule: "0 2 * * *", command: "echo backup" });
 		await service.pause("daily-backup");
-		expect(service.pause("daily-backup")).rejects.toThrow(TaskAlreadyPausedError);
+		await expect(service.pause("daily-backup")).rejects.toThrow(TaskAlreadyPausedError);
 	});
 
 	test("paused task preserves other fields", async () => {
@@ -268,12 +268,12 @@ describe("TaskService.resume", () => {
 	});
 
 	test("AC-007: throws TaskNotFoundError for non-existent task", async () => {
-		expect(service.resume("ghost")).rejects.toThrow(TaskNotFoundError);
+		await expect(service.resume("ghost")).rejects.toThrow(TaskNotFoundError);
 	});
 
 	test("AC-006: throws TaskAlreadyActiveError for already-active task", async () => {
 		await service.add({ name: "daily-backup", schedule: "0 2 * * *", command: "echo backup" });
-		expect(service.resume("daily-backup")).rejects.toThrow(TaskAlreadyActiveError);
+		await expect(service.resume("daily-backup")).rejects.toThrow(TaskAlreadyActiveError);
 	});
 
 	test("resumed task preserves other fields", async () => {
@@ -299,11 +299,11 @@ describe("TaskService.add — tags", () => {
 	});
 
 	test("AC-003: rejects invalid tag format", async () => {
-		expect(service.add({ name: "bad-tag", schedule: "0 0 * * *", command: "echo hi", tags: ["BAD TAG"] })).rejects.toThrow(InvalidTagError);
+		await expect(service.add({ name: "bad-tag", schedule: "0 0 * * *", command: "echo hi", tags: ["BAD TAG"] })).rejects.toThrow(InvalidTagError);
 	});
 
 	test("AC-003: rejects empty string tag", async () => {
-		expect(service.add({ name: "empty-tag", schedule: "0 0 * * *", command: "echo hi", tags: [""] })).rejects.toThrow(InvalidTagError);
+		await expect(service.add({ name: "empty-tag", schedule: "0 0 * * *", command: "echo hi", tags: [""] })).rejects.toThrow(InvalidTagError);
 	});
 
 	test("AC-007: deduplicates tags", async () => {
@@ -364,12 +364,12 @@ describe("TaskService.update — tags", () => {
 
 	test("AC-004: rejects invalid tag on update", async () => {
 		await service.add({ name: "my-task", schedule: "0 0 * * *", command: "echo hi" });
-		expect(service.update("my-task", { tags: ["BAD TAG"] })).rejects.toThrow(InvalidTagError);
+		await expect(service.update("my-task", { tags: ["BAD TAG"] })).rejects.toThrow(InvalidTagError);
 	});
 
 	test("AC-004: rejects invalid untag on update", async () => {
 		await service.add({ name: "my-task", schedule: "0 0 * * *", command: "echo hi", tags: ["backup"] });
-		expect(service.update("my-task", { untags: ["BAD TAG"] })).rejects.toThrow(InvalidTagError);
+		await expect(service.update("my-task", { untags: ["BAD TAG"] })).rejects.toThrow(InvalidTagError);
 	});
 
 	test("removing all tags results in empty array", async () => {

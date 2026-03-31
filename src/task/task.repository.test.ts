@@ -25,17 +25,17 @@ describe("TaskRepository.load", () => {
 
 	test("AC-018: throws ManifestCorruptedError for invalid JSON", async () => {
 		await Bun.write(tasksPath, "not json at all");
-		expect(repo.load()).rejects.toThrow(ManifestCorruptedError);
+		await expect(repo.load()).rejects.toThrow(ManifestCorruptedError);
 	});
 
 	test("AC-018: throws ManifestCorruptedError for JSON without required fields", async () => {
 		await Bun.write(tasksPath, JSON.stringify({ foo: "bar" }));
-		expect(repo.load()).rejects.toThrow(ManifestCorruptedError);
+		await expect(repo.load()).rejects.toThrow(ManifestCorruptedError);
 	});
 
 	test("FR-010: throws ManifestVersionError for unrecognized version", async () => {
 		await Bun.write(tasksPath, JSON.stringify({ version: 2, tasks: [] }));
-		expect(repo.load()).rejects.toThrow(ManifestVersionError);
+		await expect(repo.load()).rejects.toThrow(ManifestVersionError);
 	});
 
 	test("loads valid manifest", async () => {

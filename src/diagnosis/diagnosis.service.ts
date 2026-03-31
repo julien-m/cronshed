@@ -1,9 +1,8 @@
 // @spec FR-063: DiagnosisService — .specs/features/010-task-diagnosis/spec.md#fr-063
 
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { stat, access } from "node:fs/promises";
 import { constants } from "node:fs";
-import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { parseExpression } from "cron-parser";
 import type { Task } from "../task/task.types";
