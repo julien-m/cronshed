@@ -10,6 +10,16 @@ import { WrapperGenerationError } from "./wrapper.errors";
  * Static bash body for wrapper scripts.
  * Uses {{COMMAND}} as placeholder for the actual command.
  * All bash variables use $ syntax which must not be interpolated by TypeScript.
+ *
+ * Execution flow:
+ *   1. Create temp files for stdout/stderr capture
+ *   2. Run the command, redirect output to temp files
+ *   3. Capture exit code, end timestamp, and duration
+ *   4. _truncate() reads the first CRONSHED_MAX_OUTPUT bytes; appends "... [truncated]" if longer
+ *   5. _json_escape() makes stdout/stderr safe for embedding in a JSON string:
+ *      backslashes → \\, double quotes → \", newlines → \n, CR → \r, tabs → \t
+ *   6. Append a single JSON log entry to the JSONL log file
+ *   7. Clean up temp files and propagate the original exit code
  */
 // prettier-ignore
 const WRAPPER_SCRIPT_BODY = [
