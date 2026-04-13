@@ -192,6 +192,7 @@ describe("WrapperService", () => {
 				allowParallel: false,
 				lockFilePath: "$CRONSHED_LOCK_DIR/abc123.lock",
 				locksDir: "/tmp/locks",
+				flockPath: "/usr/bin/flock",
 			});
 
 			expect(script).toContain("flock -n 9");
@@ -287,6 +288,7 @@ describe("WrapperService", () => {
 				lockFilePath: "$CRONSHED_LOCK_DIR/abc.lock",
 				locksDir: "/tmp/locks",
 				timeout: { seconds: 120, tool: "gtimeout" },
+				flockPath: "/usr/bin/flock",
 			});
 
 			expect(script).toContain("flock -n 9");
@@ -305,6 +307,7 @@ describe("WrapperService", () => {
 				allowParallel: false,
 				lockFilePath: "$CRONSHED_LOCK_DIR/abc.lock",
 				locksDir: "/tmp/locks",
+				flockPath: "/usr/bin/flock",
 			});
 
 			expect(script).toContain('"skipped":true');

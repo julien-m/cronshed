@@ -156,18 +156,20 @@ export class WrapperService {
 		if (task.timeout) {
 			const { parseDuration } = await import("./duration");
 			const seconds = parseDuration(task.timeout);
-			const tool = await detectTimeoutTool();
+			const tool = await detectTimeoutPath();  // Use absolute path for cron compatibility
 			timeoutConfig = { seconds, tool };
 		}
 
 		// Compute lock hash if single-instance is enabled
 		let lockFilePath: string | undefined;
 		let locksDir: string | undefined;
+		let flockPath: string | undefined;
 		if (!task.allowParallel) {
 			locksDir = join(this.dataDir, "locks");
 			const configPath = task.configPath ?? join(this.dataDir, "tasks.json");
 			const hash = computeLockHash(configPath, task.name);
 			lockFilePath = `$CRONSHED_LOCK_DIR/${hash}.lock`;
+			flockPath = await detectFlockPath();
 		}
 
 		const config: WrapperConfig = {
@@ -180,6 +182,7 @@ export class WrapperService {
 			timeout: timeoutConfig,
 			lockFilePath,
 			locksDir,
+			flockPath,
 		};
 
 		try {
@@ -262,11 +265,13 @@ export class WrapperService {
 	 * Build the bash wrapper script content.
 	 * When allowParallel is false, wraps execution in a flock block.
 	 * When timeout is configured, wraps command with timeout tool.
+	 * @param config Wrapper generation configuration
+	 * @returns Full wrapper script content
 	 */
 	// @spec FR-037: Wrapper script content — .specs/features/005-wrapper-script-generation/spec.md#fr-037
 	// @spec FR-086: Flock block, FR-090: Timeout wrapping, FR-091: timedOut field — .specs/features/015-wrapper-protections/spec.md#fr-086
 	buildScript(config: WrapperConfig): string {
-		const { taskName, command, logPath, maxOutputBytes, notify, allowParallel, timeout, lockFilePath, locksDir } = config;
+		const { taskName, command, logPath, maxOutputBytes, notify, allowParallel, timeout, lockFilePath, locksDir, flockPath } = config;
 		const logsDir = this.logsDir;
 		const timestamp = new Date().toISOString();
 
@@ -323,20 +328,20 @@ export class WrapperService {
 			script += 'CRONSHED_LOCK_DIR="' + locksDir + '"\n';
 			script += 'CRONSHED_LOCK_FILE="' + locksDir + "/" + lockFilePath.replace("$CRONSHED_LOCK_DIR/", "") + '"\n\n';
 			script += 'mkdir -p "$CRONSHED_LOCK_DIR"\n\n';
-			// Guard: if flock is not available, fall through to run without lock
-			script += 'if command -v flock >/dev/null 2>&1; then\n';
-			script += "(\n";
-			script += "  flock -n 9 || {\n";
-			script += FLOCK_SKIP_BLOCK + "\n";
-			script += "  }\n";
-			script += '  echo $$ > "$CRONSHED_LOCK_FILE"\n\n';
-			// Indent the body inside the subshell
-			script += indentBlock(body, "  ");
-			script += '\n) 9>"$CRONSHED_LOCK_FILE"\n';
-			script += "else\n";
-			// Fallback: run without flock protection
-			script += indentBlock(body, "  ");
-			script += "\nfi\n";
+			if (flockPath) {
+				// Use absolute path resolved at generation time (cron PATH may not include flock)
+				script += "(\n";
+				script += "  " + flockPath + " -n 9 || {\n";
+				script += FLOCK_SKIP_BLOCK + "\n";
+				script += "  }\n";
+				script += '  echo $$ > "$CRONSHED_LOCK_FILE"\n\n';
+				// Indent the body inside the subshell
+				script += indentBlock(body, "  ");
+				script += '\n) 9>"$CRONSHED_LOCK_FILE"\n';
+			} else {
+				// flock not available at generation time — run without lock protection
+				script += body;
+			}
 		} else {
 			script += body;
 		}
@@ -366,6 +371,30 @@ export async function detectTimeoutTool(): Promise<string> {
 	for (const tool of ["gtimeout", "timeout"]) {
 		const result = await Bun.$`which ${tool}`.quiet().nothrow();
 		if (result.exitCode === 0) return tool;
+	}
+	throw new TimeoutToolMissingError();
+}
+
+/**
+ * Detect the absolute path to flock.
+ * @returns Absolute flock path when available; otherwise undefined
+ */
+export async function detectFlockPath(): Promise<string | undefined> {
+	const result = await Bun.$`which flock`.quiet().nothrow();
+	if (result.exitCode === 0) return result.text().trim();
+	return undefined;
+}
+
+/**
+ * Detect the absolute path to the timeout tool.
+ * Checks gtimeout first (macOS with coreutils), then timeout (Linux).
+ * @returns Absolute path to timeout tool when available
+ * @throws TimeoutToolMissingError if neither is found
+ */
+export async function detectTimeoutPath(): Promise<string> {
+	for (const tool of ["gtimeout", "timeout"]) {
+		const result = await Bun.$`which ${tool}`.quiet().nothrow();
+		if (result.exitCode === 0) return result.text().trim();
 	}
 	throw new TimeoutToolMissingError();
 }

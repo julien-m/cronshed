@@ -10,6 +10,7 @@ export interface WrapperConfig {
 	timeout?: { seconds: number; tool: string };
 	lockFilePath?: string;
 	locksDir?: string;
+	flockPath?: string;
 }
 
 /** Maximum stderr characters included in notification message. */

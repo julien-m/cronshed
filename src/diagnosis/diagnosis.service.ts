@@ -207,12 +207,21 @@ export class DiagnosisService {
 			try {
 				const seconds = parseDuration(task.timeout);
 				// We cannot async detect the tool here, so read it from the on-disk wrapper
-				const toolMatch = onDiskContent.match(/CRONSHED_TIMEOUT_CMD="(\w+)"/);
+				const toolMatch = onDiskContent.match(/CRONSHED_TIMEOUT_CMD="([^"]+)"/);
 				if (toolMatch) {
 					timeoutConfig = { seconds, tool: toolMatch[1]! };
 				}
 			} catch {
 				// If duration is invalid, skip timeout comparison
+			}
+		}
+
+		// Resolve flock path from on-disk wrapper for comparison
+		let flockPath: string | undefined;
+		if (!isParallel) {
+			const flockMatch = onDiskContent.match(/^\s+(\S+flock) -n 9/m);
+			if (flockMatch) {
+				flockPath = flockMatch[1]!;
 			}
 		}
 
@@ -226,6 +235,7 @@ export class DiagnosisService {
 			lockFilePath,
 			locksDir,
 			timeout: timeoutConfig,
+			flockPath,
 		});
 
 		const stripTimestamp = (content: string): string =>
