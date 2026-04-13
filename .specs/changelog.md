@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-04-13 — Feature: Wrapper Protections implemented
+
+- **Type:** Feature Implemented
+- **Feature:** [015-wrapper-protections](features/015-wrapper-protections/implementation.md) — 501 tests total (all pass), 18 AC, 14 FR
+- **Files changed:** 10 new files, 13 modified files
+- **Key additions:** flock single-instance (default ON), timeout via gtimeout/timeout, global default-timeout-ratio config, short-schedule warning, skip/timeout log fields
+- **Author:** tool (spec.implement --auto)
+
+---
+
 ## 2026-03-31 — Check: Full spec-code alignment verified (all 14 features)
 
 - **Type:** Spec Check

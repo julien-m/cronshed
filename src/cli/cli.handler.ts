@@ -27,11 +27,13 @@ import {
 	CommandFileNotExecutableError,
 	CommandPathIsDirectoryError,
 } from "./command.errors";
-import { WrapperGenerationError } from "../wrapper/wrapper.errors";
+import { WrapperGenerationError, TimeoutToolMissingError } from "../wrapper/wrapper.errors";
+import { InvalidConfigKeyError, InvalidConfigValueError } from "../config/config.service";
 import { formatError } from "./formatters/base.formatter";
 import { handleAdd, handleUpdate, handleRemove, handlePause, handleResume } from "./handlers/task-crud.handler";
 import { handleList, handleGet, handleHistory, handleTags } from "./handlers/task-query.handler";
 import { handleSync, handleDoctor, handleImport, handleRotate, handleRun } from "./handlers/ops.handler";
+import { handleConfig } from "./handlers/config.handler";
 
 // @spec FR-008: Map domain errors to exit codes — .specs/features/001-task-manifest/spec.md#fr-008
 function getExitCode(err: unknown): number {
@@ -43,7 +45,10 @@ function getExitCode(err: unknown): number {
 		err instanceof CommandFileNotFoundError ||
 		err instanceof CommandFileNotExecutableError ||
 		err instanceof CommandPathIsDirectoryError ||
-		err instanceof NoChangesSpecifiedError
+		err instanceof NoChangesSpecifiedError ||
+		err instanceof TimeoutToolMissingError ||
+		err instanceof InvalidConfigKeyError ||
+		err instanceof InvalidConfigValueError
 	) {
 		return 2;
 	}
@@ -99,6 +104,9 @@ function getErrorHint(err: unknown): string | undefined {
 	if (err instanceof WrapperGenerationError) {
 		return "Check permissions for the wrappers directory";
 	}
+	if (err instanceof TimeoutToolMissingError) {
+		return undefined; // Message already includes install instructions
+	}
 	return undefined;
 }
 
@@ -119,12 +127,14 @@ const MUTATION_SUBCOMMANDS: Record<string, (args: string[], service: TaskService
 
 /** Commands that manage their own dependencies (no shared TaskService). */
 // @spec FR-010: Register run command — .specs/features/014-dry-run-mode/spec.md#fr-010
+// @spec FR-093: Register config command — .specs/features/015-wrapper-protections/spec.md#fr-093
 const STANDALONE_COMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 	sync: handleSync,
 	doctor: handleDoctor,
 	import: handleImport,
 	rotate: handleRotate,
 	run: handleRun,
+	config: handleConfig,
 };
 
 /**
@@ -141,10 +151,13 @@ export async function runCli(argv: string[]): Promise<void> {
 		console.log("");
 		console.log("Commands:");
 		// @spec FR-015: Help text with tag flags — .specs/features/013-task-groups-tags/spec.md#fr-015
-		console.log("  add <name> --schedule '<cron>' --command '<cmd>' [--notify] [--tag <tag>]... [--no-sync]   Add a task");
+		// @spec FR-088: Help text for protection flags — .specs/features/015-wrapper-protections/spec.md#fr-088
+		console.log("  add <name> --schedule '<cron>' --command '<cmd>' [--notify] [--tag <tag>]...");
+		console.log("      [--allow-parallel] [--timeout <duration>] [--no-sync]                                    Add a task");
 		console.log("  list [--tag <tag>] [--json]                                                                  List all tasks");
 		console.log("  get <name> [--json]                                                                          Show task details");
-		console.log("  update <name> [--schedule] [--command] [--notify|--no-notify] [--tag]... [--untag]... [--no-sync]  Update a task");
+		console.log("  update <name> [--schedule] [--command] [--notify|--no-notify] [--tag]... [--untag]...");
+		console.log("      [--allow-parallel|--no-allow-parallel] [--timeout <duration>] [--no-sync]                Update a task");
 		console.log("  remove <name> [--no-sync]                                                                    Remove a task");
 		// @spec FR-062: Help text for pause/resume — .specs/features/009-task-pause-resume/spec.md#fr-062
 		console.log("  pause <name> [--no-sync]                                                                     Pause a task");
@@ -157,6 +170,9 @@ export async function runCli(argv: string[]): Promise<void> {
 		console.log("  import [--dry-run] [--prefix <name>]                                                          Import crontab entries");
 		console.log("  rotate [name] [--max-age <days>] [--max-entries <N>] [--dry-run] [--json]                     Rotate execution logs");
 		console.log("  run <name> [--json]                                                                           Run a task immediately");
+		// @spec FR-093: Help text for config command — .specs/features/015-wrapper-protections/spec.md#fr-093
+		console.log("  config set <key> <value>                                                                      Set a config value");
+		console.log("  config get <key>                                                                              Get a config value");
 		return;
 	}
 

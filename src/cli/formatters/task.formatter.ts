@@ -63,6 +63,7 @@ export function formatTaskTable(tasks: EnrichedTask[]): string {
 export function formatTaskDetails(task: EnrichedTask): string {
 	// @spec FR-054: Display notify status — .specs/features/008-failure-notifications/spec.md#fr-054
 	// @spec FR-013: Display tags in task details — .specs/features/013-task-groups-tags/spec.md#fr-013
+	// @spec FR-088: Display protection fields — .specs/features/015-wrapper-protections/spec.md#fr-088
 	const lines = [
 		`Name:       ${task.name}`,
 		`ID:         ${task.id}`,
@@ -70,6 +71,8 @@ export function formatTaskDetails(task: EnrichedTask): string {
 		`Command:    ${task.command}`,
 		`Status:     ${task.status}`,
 		`Notify:     ${task.notify ? "on" : "off"}`,
+		`Parallel:   ${task.allowParallel ? "allowed" : "blocked"}`,
+		`Timeout:    ${task.timeout ?? "\u2014"}`,
 		`Tags:       ${task.tags.length > 0 ? task.tags.join(", ") : "\u2014"}`,
 		`Created:    ${task.createdAt}`,
 	];
@@ -99,23 +102,32 @@ export function formatTaskDetails(task: EnrichedTask): string {
  * @returns Formatted table string
  */
 export function formatHistoryTable(entries: ExecutionLogEntry[]): string {
-	const headers = ["TIMESTAMP", "EXIT CODE", "DURATION", "STDOUT", "STDERR"];
-	const rows = entries.map((e) => [
-		formatTimestampWithSeconds(e.timestamp),
-		formatExitCode(e.exitCode),
-		formatDuration(e.durationMs),
-		truncateOutput(e.stdout, HISTORY_OUTPUT_MAX_CHARS),
-		truncateOutput(e.stderr, HISTORY_OUTPUT_MAX_CHARS),
-	]);
+	// @spec FR-087: Display skip entries, FR-091: Display timeout entries — .specs/features/015-wrapper-protections/spec.md#fr-087
+	const headers = ["TIMESTAMP", "EXIT CODE", "DURATION", "STDOUT", "STDERR", "NOTE"];
+	const rows = entries.map((e) => {
+		const note = e.skipped ? "skipped" : e.timedOut ? "timed out" : "";
+		return [
+			formatTimestampWithSeconds(e.timestamp),
+			formatExitCode(e.exitCode),
+			e.skipped ? "\u2014" : formatDuration(e.durationMs),
+			e.skipped ? "\u2014" : truncateOutput(e.stdout, HISTORY_OUTPUT_MAX_CHARS),
+			e.skipped ? "\u2014" : truncateOutput(e.stderr, HISTORY_OUTPUT_MAX_CHARS),
+			note,
+		];
+	});
 
 	// Calculate column widths using raw (uncolored) text for alignment
-	const rawRows = entries.map((e) => [
-		formatTimestampWithSeconds(e.timestamp),
-		String(e.exitCode),
-		formatDuration(e.durationMs),
-		truncateOutput(e.stdout, HISTORY_OUTPUT_MAX_CHARS),
-		truncateOutput(e.stderr, HISTORY_OUTPUT_MAX_CHARS),
-	]);
+	const rawRows = entries.map((e) => {
+		const note = e.skipped ? "skipped" : e.timedOut ? "timed out" : "";
+		return [
+			formatTimestampWithSeconds(e.timestamp),
+			String(e.exitCode),
+			e.skipped ? "\u2014" : formatDuration(e.durationMs),
+			e.skipped ? "\u2014" : truncateOutput(e.stdout, HISTORY_OUTPUT_MAX_CHARS),
+			e.skipped ? "\u2014" : truncateOutput(e.stderr, HISTORY_OUTPUT_MAX_CHARS),
+			note,
+		];
+	});
 
 	const colWidths = headers.map((h, i) =>
 		Math.max(h.length, ...rawRows.map((r) => (r[i] ?? "").length))

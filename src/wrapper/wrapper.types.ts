@@ -6,6 +6,10 @@ export interface WrapperConfig {
 	logPath: string;
 	maxOutputBytes: number;
 	notify: boolean;
+	allowParallel: boolean;
+	timeout?: { seconds: number; tool: string };
+	lockFilePath?: string;
+	locksDir?: string;
 }
 
 /** Maximum stderr characters included in notification message. */

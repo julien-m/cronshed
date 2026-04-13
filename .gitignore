@@ -41,3 +41,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Brainstorm symlink (external project)
 .brainstorm
+.claude/commands/spec.*.md
+.claude/agents/livespec-*.md
+.specs/.livespec-path
+test-results/

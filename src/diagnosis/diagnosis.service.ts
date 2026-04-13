@@ -11,10 +11,12 @@ import type { TaskRepository } from "../task/task.repository";
 import type { CrontabAdapter } from "../crontab/crontab.adapter";
 import type { CrontabEntry } from "../crontab/crontab.types";
 import type { WrapperService } from "../wrapper/wrapper.service";
+import { computeLockHash } from "../wrapper/wrapper.service";
 import type { DiagnosisResult, DiagnosisIssue } from "./diagnosis.types";
 import { DIAGNOSIS_CHECKS } from "./diagnosis.types";
 import { MAX_OUTPUT_BYTES } from "../wrapper/wrapper.types";
 import { isFilePath } from "../cli/command.resolver";
+import { parseDuration } from "../wrapper/duration";
 
 export class DiagnosisService {
 	private readonly logsDir: string;
@@ -192,12 +194,38 @@ export class DiagnosisService {
 
 		// Generate expected content and compare (strip Generated timestamp for comparison)
 		const logPath = join(this.logsDir, `${task.name}.jsonl`);
+		const isParallel = task.allowParallel ?? false;
+		const locksDir = !isParallel ? join(this.dataDir, "locks") : undefined;
+		const configPath = this.repo.getPath();
+		const lockFilePath = !isParallel
+			? `$CRONSHED_LOCK_DIR/${computeLockHash(configPath, task.name)}.lock`
+			: undefined;
+
+		// Resolve timeout config for comparison
+		let timeoutConfig: { seconds: number; tool: string } | undefined;
+		if (task.timeout) {
+			try {
+				const seconds = parseDuration(task.timeout);
+				// We cannot async detect the tool here, so read it from the on-disk wrapper
+				const toolMatch = onDiskContent.match(/CRONSHED_TIMEOUT_CMD="(\w+)"/);
+				if (toolMatch) {
+					timeoutConfig = { seconds, tool: toolMatch[1]! };
+				}
+			} catch {
+				// If duration is invalid, skip timeout comparison
+			}
+		}
+
 		const expectedContent = this.wrapperService.buildScript({
 			taskName: task.name,
 			command: task.command,
 			logPath,
 			maxOutputBytes: MAX_OUTPUT_BYTES,
 			notify: task.notify,
+			allowParallel: isParallel,
+			lockFilePath,
+			locksDir,
+			timeout: timeoutConfig,
 		});
 
 		const stripTimestamp = (content: string): string =>

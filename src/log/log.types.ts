@@ -15,10 +15,16 @@ export interface LastExecution {
  * A single parsed entry from the JSONL execution log file.
  * Contains all fields written by wrapper scripts.
  */
+// @spec FR-087: Extended log entry with skip/timeout fields — .specs/features/015-wrapper-protections/spec.md#fr-087
 export interface ExecutionLogEntry {
 	timestamp: string;
 	exitCode: number;
 	durationMs: number;
 	stdout: string;
 	stderr: string;
+	skipped?: boolean;
+	skippedAt?: string;
+	reason?: string;
+	pidHolder?: number;
+	timedOut?: boolean;
 }

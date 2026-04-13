@@ -1,16 +1,45 @@
 // Mutation handlers: add, update, remove, pause, resume.
 // @spec FR-029, FR-030, FR-031, FR-032, FR-033, FR-034: Mutation auto-sync — .specs/features/004-auto-sync/spec.md#fr-029
+// @spec FR-088: Protection flags on add/update — .specs/features/015-wrapper-protections/spec.md#fr-088
 
 import { parseArgs } from "node:util";
 import { TaskService } from "../../task/task.service";
 import { TaskRepository } from "../../task/task.repository";
 import { WrapperService } from "../../wrapper/wrapper.service";
 import { resolveCommand } from "../command.resolver";
-import { getDataDir } from "../../app/config";
-import { formatSuccess, formatError } from "../formatters/base.formatter";
+import { getDataDir, getTasksPath } from "../../app/config";
+import { formatSuccess, formatError, formatWarning } from "../formatters/base.formatter";
 import { autoSync } from "./shared";
+import { parseDuration } from "../../wrapper/duration";
+import { scheduleToIntervalSeconds } from "../../cron/schedule-interval";
+import { ConfigRepository } from "../../config/config.repository";
+import { ConfigService } from "../../config/config.service";
+import { detectTimeoutTool } from "../../wrapper/wrapper.service";
+
+// @spec FR-094: Compute timeout from ratio — .specs/features/015-wrapper-protections/spec.md#fr-094
+/** Minimum auto-computed timeout in seconds. */
+const MIN_AUTO_TIMEOUT_SECONDS = 10;
+
+/**
+ * If explicit timeout is not set, compute timeout from default-timeout-ratio config.
+ * Returns the timeout seconds or undefined if no ratio is configured.
+ */
+async function computeTimeoutFromRatio(schedule: string): Promise<number | undefined> {
+	const configRepo = new ConfigRepository();
+	const configService = new ConfigService(configRepo);
+	const ratioStr = await configService.get("default-timeout-ratio");
+	if (!ratioStr) return undefined;
+
+	const ratio = parseFloat(ratioStr);
+	const intervalSeconds = scheduleToIntervalSeconds(schedule);
+	if (intervalSeconds === null) return undefined;
+
+	const computed = Math.floor(intervalSeconds * ratio);
+	return Math.max(computed, MIN_AUTO_TIMEOUT_SECONDS);
+}
 
 // @spec FR-029, FR-034: Auto-sync on add with --no-sync flag — .specs/features/004-auto-sync/spec.md#fr-029
+// @spec FR-088: Parse --allow-parallel and --timeout — .specs/features/015-wrapper-protections/spec.md#fr-088
 export async function handleAdd(args: string[], service: TaskService, repo: TaskRepository): Promise<void> {
 	const name = args[0];
 	if (!name) {
@@ -28,6 +57,8 @@ export async function handleAdd(args: string[], service: TaskService, repo: Task
 			notify: { type: "boolean", default: false },
 			tag: { type: "string", multiple: true },
 			"no-sync": { type: "boolean", default: false },
+			"allow-parallel": { type: "boolean", default: false },
+			timeout: { type: "string" },
 		},
 		allowPositionals: false,
 	});
@@ -41,21 +72,59 @@ export async function handleAdd(args: string[], service: TaskService, repo: Task
 		process.exit(2);
 	}
 
-	// @spec FR-016: Include resolved path in success message, FR-017: Path resolution on add — .specs/features/002-command-path-resolution/spec.md#fr-016
-	const resolution = await resolveCommand(values.command);
+	// Validate timeout format if provided
+	if (values.timeout) {
+		parseDuration(values.timeout); // throws on invalid format
+	}
+
+	// @spec FR-016: Include resolved path in success message — .specs/features/002-command-path-resolution/spec.md#fr-016
+	const resolution = await resolveCommand(values.command!);
+
+	// Determine effective timeout
+	let effectiveTimeout = values.timeout;
+	let effectiveTimeoutSeconds: number | undefined;
+
+	if (values.timeout) {
+		effectiveTimeoutSeconds = parseDuration(values.timeout);
+	} else {
+		// @spec FR-094: Auto-compute timeout from ratio — .specs/features/015-wrapper-protections/spec.md#fr-094
+		effectiveTimeoutSeconds = await computeTimeoutFromRatio(values.schedule!);
+		if (effectiveTimeoutSeconds !== undefined) {
+			effectiveTimeout = `${effectiveTimeoutSeconds}s`;
+		}
+	}
+
+	// @spec FR-089: Check timeout tool availability — .specs/features/015-wrapper-protections/spec.md#fr-089
+	if (effectiveTimeout) {
+		await detectTimeoutTool(); // throws TimeoutToolMissingError if not found
+	}
+
+	// @spec FR-096: Short-schedule warning — .specs/features/015-wrapper-protections/spec.md#fr-096
+	if (!effectiveTimeout) {
+		const intervalSeconds = scheduleToIntervalSeconds(values.schedule!);
+		if (intervalSeconds !== null && intervalSeconds <= 60) {
+			console.error(formatWarning("Schedule runs every minute. Consider adding --timeout to prevent overlap."));
+		}
+	}
 
 	// @spec FR-051: Pass notify flag to task creation — .specs/features/008-failure-notifications/spec.md#fr-051
 	const task = await service.add({
 		name,
-		schedule: values.schedule,
+		schedule: values.schedule!,
 		command: resolution.resolved,
 		notify: values.notify ?? false,
 		tags: values.tag,
+		allowParallel: values["allow-parallel"] ?? false,
+		timeout: effectiveTimeout,
 	});
 
 	// @spec FR-042: Generate wrapper on add — .specs/features/005-wrapper-script-generation/spec.md#fr-042
+	// @spec FR-086: Pass protection fields to wrapper gen — .specs/features/015-wrapper-protections/spec.md#fr-086
 	const wrapperService = new WrapperService(getDataDir());
-	await wrapperService.generate(task);
+	await wrapperService.generate({
+		...task,
+		configPath: getTasksPath(),
+	});
 
 	if (resolution.isFilePath) {
 		console.log(formatSuccess(`Task ${task.name} created (command: ${resolution.resolved})`));
@@ -69,6 +138,7 @@ export async function handleAdd(args: string[], service: TaskService, repo: Task
 }
 
 // @spec FR-031, FR-034: Auto-sync on update with --no-sync flag — .specs/features/004-auto-sync/spec.md#fr-031
+// @spec FR-088: Parse --allow-parallel and --timeout on update — .specs/features/015-wrapper-protections/spec.md#fr-088
 export async function handleUpdate(args: string[], service: TaskService, repo: TaskRepository): Promise<void> {
 	const name = args[0];
 	if (!name) {
@@ -89,9 +159,17 @@ export async function handleUpdate(args: string[], service: TaskService, repo: T
 			tag: { type: "string", multiple: true },
 			untag: { type: "string", multiple: true },
 			"no-sync": { type: "boolean", default: false },
+			"allow-parallel": { type: "boolean" },
+			"no-allow-parallel": { type: "boolean" },
+			timeout: { type: "string" },
 		},
 		allowPositionals: false,
 	});
+
+	// Validate timeout format if provided
+	if (values.timeout) {
+		parseDuration(values.timeout); // throws on invalid format
+	}
 
 	// @spec FR-017: Path resolution on update — .specs/features/002-command-path-resolution/spec.md#fr-017
 	let resolvedCommand = values.command;
@@ -103,19 +181,32 @@ export async function handleUpdate(args: string[], service: TaskService, repo: T
 	// Resolve notify: --notify wins over --no-notify, undefined if neither
 	const notifyValue = values.notify === true ? true : values["no-notify"] === true ? false : undefined;
 
+	// Resolve allowParallel: --allow-parallel wins over --no-allow-parallel
+	const allowParallelValue = values["allow-parallel"] === true ? true : values["no-allow-parallel"] === true ? false : undefined;
+
+	// @spec FR-089: Check timeout tool availability on update — .specs/features/015-wrapper-protections/spec.md#fr-089
+	if (values.timeout) {
+		await detectTimeoutTool();
+	}
+
 	const task = await service.update(name, {
 		schedule: values.schedule,
 		command: resolvedCommand,
 		notify: notifyValue,
 		tags: values.tag,
 		untags: values.untag,
+		allowParallel: allowParallelValue,
+		timeout: values.timeout,
 	});
 
-	// @spec FR-042: Regenerate wrapper on command or notify change — .specs/features/005-wrapper-script-generation/spec.md#fr-042
-	// @spec FR-052: Regenerate wrapper when notify changes — .specs/features/008-failure-notifications/spec.md#fr-052
-	if (values.command || notifyValue !== undefined) {
+	// @spec FR-042: Regenerate wrapper on command, notify, or protection change — .specs/features/005-wrapper-script-generation/spec.md#fr-042
+	const shouldRegenerate = values.command || notifyValue !== undefined || allowParallelValue !== undefined || values.timeout !== undefined;
+	if (shouldRegenerate) {
 		const wrapperService = new WrapperService(getDataDir());
-		await wrapperService.generate(task);
+		await wrapperService.generate({
+			...task,
+			configPath: getTasksPath(),
+		});
 	}
 
 	console.log(formatSuccess(`Task ${task.name} updated`));

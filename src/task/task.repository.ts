@@ -58,8 +58,9 @@ export class TaskRepository {
 			throw new ManifestVersionError(MANIFEST_VERSION, manifest.version);
 		}
 
-		// Backward compat: tasks created before 008-failure-notifications have no notify field
+		// Backward compat: tasks created before various features may lack fields
 		// @spec FR-006: Backward compat for tags field — .specs/features/013-task-groups-tags/spec.md#fr-006
+		// @spec FR-088: Backward compat for protection fields — .specs/features/015-wrapper-protections/spec.md#fr-088
 		const result = parsed as TaskManifest;
 		for (const task of result.tasks) {
 			if ((task as unknown as Record<string, unknown>).notify === undefined) {
@@ -68,6 +69,7 @@ export class TaskRepository {
 			if ((task as unknown as Record<string, unknown>).tags === undefined) {
 				task.tags = [];
 			}
+			// Protection fields default to undefined (falsy for allowParallel = single-instance ON)
 		}
 		return result;
 	}

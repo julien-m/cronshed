@@ -52,6 +52,7 @@ export class TaskService {
 		}
 
 		// @spec FR-047: Default notify to false — .specs/features/008-failure-notifications/spec.md#fr-047
+		// @spec FR-088: Store protection fields — .specs/features/015-wrapper-protections/spec.md#fr-088
 		const task: Task = {
 			id: crypto.randomUUID(),
 			name: input.name,
@@ -60,6 +61,8 @@ export class TaskService {
 			status: "active",
 			notify: input.notify ?? false,
 			tags: normalizeTags(tags),
+			allowParallel: input.allowParallel ?? false,
+			timeout: input.timeout,
 			createdAt: new Date().toISOString(),
 		};
 
@@ -111,8 +114,11 @@ export class TaskService {
 		// @spec FR-005: Tag/untag on update — .specs/features/013-task-groups-tags/spec.md#fr-005
 		const hasTags = input.tags !== undefined && input.tags.length > 0;
 		const hasUntags = input.untags !== undefined && input.untags.length > 0;
+		// @spec FR-088: Protection fields on update — .specs/features/015-wrapper-protections/spec.md#fr-088
+		const hasAllowParallel = input.allowParallel !== undefined;
+		const hasTimeout = input.timeout !== undefined;
 
-		if (!hasSchedule && !hasCommand && !hasNotify && !hasTags && !hasUntags) {
+		if (!hasSchedule && !hasCommand && !hasNotify && !hasTags && !hasUntags && !hasAllowParallel && !hasTimeout) {
 			throw new NoChangesSpecifiedError();
 		}
 
@@ -155,6 +161,13 @@ export class TaskService {
 		// @spec FR-047: Update notify field — .specs/features/008-failure-notifications/spec.md#fr-047
 		if (hasNotify) {
 			task.notify = input.notify!;
+		}
+		// @spec FR-088: Update protection fields — .specs/features/015-wrapper-protections/spec.md#fr-088
+		if (hasAllowParallel) {
+			task.allowParallel = input.allowParallel;
+		}
+		if (hasTimeout) {
+			task.timeout = input.timeout;
 		}
 
 		// @spec FR-005: Apply tag additions and removals — .specs/features/013-task-groups-tags/spec.md#fr-005
