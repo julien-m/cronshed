@@ -1,5 +1,10 @@
 // @spec FR-038: Output truncation limit — .specs/features/005-wrapper-script-generation/spec.md#fr-038
 
+export interface WrapperTimeoutConfig {
+	seconds: number;
+	tool: string;
+}
+
 export interface WrapperConfig {
 	taskName: string;
 	command: string;
@@ -7,7 +12,7 @@ export interface WrapperConfig {
 	maxOutputBytes: number;
 	notify: boolean;
 	allowParallel: boolean;
-	timeout?: { seconds: number; tool: string };
+	timeout?: WrapperTimeoutConfig;
 	lockFilePath?: string;
 	locksDir?: string;
 	flockPath?: string;

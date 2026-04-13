@@ -156,7 +156,7 @@ export class WrapperService {
 		if (task.timeout) {
 			const { parseDuration } = await import("./duration");
 			const seconds = parseDuration(task.timeout);
-			const tool = await detectTimeoutPath();  // Use absolute path for cron compatibility
+			const tool = await detectTimeoutPath();
 			timeoutConfig = { seconds, tool };
 		}
 
@@ -368,9 +368,10 @@ function indentBlock(text: string, prefix: string): string {
  * @throws TimeoutToolMissingError if neither is found
  */
 export async function detectTimeoutTool(): Promise<string> {
-	for (const tool of ["gtimeout", "timeout"]) {
-		const result = await Bun.$`which ${tool}`.quiet().nothrow();
-		if (result.exitCode === 0) return tool;
+	const toolPath = await detectFirstCommandPath(["gtimeout", "timeout"]);
+	if (toolPath) {
+		const segments = toolPath.split("/");
+		return segments[segments.length - 1] ?? toolPath;
 	}
 	throw new TimeoutToolMissingError();
 }
@@ -380,9 +381,7 @@ export async function detectTimeoutTool(): Promise<string> {
  * @returns Absolute flock path when available; otherwise undefined
  */
 export async function detectFlockPath(): Promise<string | undefined> {
-	const result = await Bun.$`which flock`.quiet().nothrow();
-	if (result.exitCode === 0) return result.text().trim();
-	return undefined;
+	return detectFirstCommandPath(["flock"]);
 }
 
 /**
@@ -392,11 +391,22 @@ export async function detectFlockPath(): Promise<string | undefined> {
  * @throws TimeoutToolMissingError if neither is found
  */
 export async function detectTimeoutPath(): Promise<string> {
-	for (const tool of ["gtimeout", "timeout"]) {
-		const result = await Bun.$`which ${tool}`.quiet().nothrow();
-		if (result.exitCode === 0) return result.text().trim();
+	const toolPath = await detectFirstCommandPath(["gtimeout", "timeout"]);
+	if (toolPath) {
+		return toolPath;
 	}
 	throw new TimeoutToolMissingError();
+}
+
+async function detectFirstCommandPath(commands: readonly string[]): Promise<string | undefined> {
+	for (const command of commands) {
+		const result = await Bun.$`which ${command}`.quiet().nothrow();
+		if (result.exitCode === 0) {
+			return result.text().trim();
+		}
+	}
+
+	return undefined;
 }
 
 // @spec FR-098: Lock hash computation — .specs/features/015-wrapper-protections/spec.md#fr-098

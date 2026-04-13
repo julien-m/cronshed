@@ -12,6 +12,7 @@ import type { CrontabAdapter } from "../crontab/crontab.adapter";
 import type { CrontabEntry } from "../crontab/crontab.types";
 import type { WrapperService } from "../wrapper/wrapper.service";
 import { computeLockHash } from "../wrapper/wrapper.service";
+import type { WrapperTimeoutConfig } from "../wrapper/wrapper.types";
 import type { DiagnosisResult, DiagnosisIssue } from "./diagnosis.types";
 import { DIAGNOSIS_CHECKS } from "./diagnosis.types";
 import { MAX_OUTPUT_BYTES } from "../wrapper/wrapper.types";
@@ -202,7 +203,7 @@ export class DiagnosisService {
 			: undefined;
 
 		// Resolve timeout config for comparison
-		let timeoutConfig: { seconds: number; tool: string } | undefined;
+		let timeoutConfig: WrapperTimeoutConfig | undefined;
 		if (task.timeout) {
 			try {
 				const seconds = parseDuration(task.timeout);

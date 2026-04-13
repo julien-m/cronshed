@@ -195,7 +195,7 @@ describe("WrapperService", () => {
 				flockPath: "/usr/bin/flock",
 			});
 
-			expect(script).toContain("flock -n 9");
+			expect(script).toContain("/usr/bin/flock -n 9");
 			expect(script).toContain("CRONSHED_LOCK_DIR=");
 			expect(script).toContain('mkdir -p "$CRONSHED_LOCK_DIR"');
 			expect(script).toContain('echo $$ > "$CRONSHED_LOCK_FILE"');
@@ -291,7 +291,7 @@ describe("WrapperService", () => {
 				flockPath: "/usr/bin/flock",
 			});
 
-			expect(script).toContain("flock -n 9");
+			expect(script).toContain("/usr/bin/flock -n 9");
 			expect(script).toContain("$CRONSHED_TIMEOUT_CMD $CRONSHED_TIMEOUT_SECS make build");
 			expect(script).toContain('"timedOut":true');
 		});
