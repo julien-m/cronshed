@@ -910,6 +910,49 @@ describe("cronshed get with tags", () => {
 	});
 });
 
+// --- Wrapper Protections (Feature 015) ---
+
+// @spec FR-078: Wrapper regenerated without flock — .specs/features/015-wrapper-protections/spec.md#fr-078
+describe("cronshed update --allow-parallel", () => {
+	test("AC-079: wrapper regenerated without flock on update --allow-parallel", async () => {
+		// Create task with default flock protection (allowParallel=false by default)
+		await run("add", "locked-task", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
+
+		// Verify wrapper has flock
+		const wrappersDir = join(tmpDir, "wrappers");
+		const wrapperBefore = await Bun.file(join(wrappersDir, "locked-task.sh")).text();
+		expect(wrapperBefore).toContain("flock");
+
+		// Update to allow parallel
+		const { stdout, exitCode } = await run("update", "locked-task", "--allow-parallel", "--no-sync");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("Task locked-task updated");
+
+		// Verify wrapper no longer has flock
+		const wrapperAfter = await Bun.file(join(wrappersDir, "locked-task.sh")).text();
+		expect(wrapperAfter).not.toContain("flock");
+		expect(wrapperAfter).not.toContain("CRONSHED_LOCK_DIR");
+	});
+});
+
+// @spec FR-096: Short-schedule warning — .specs/features/015-wrapper-protections/spec.md#fr-096
+describe("cronshed add — short schedule warning", () => {
+	test("AC-083: short-schedule warning printed to stderr when schedule <= 60s, no --timeout, no ratio", async () => {
+		// Schedule every minute (interval = 60s) without timeout
+		const { stderr, exitCode } = await run("add", "frequent-task", "--schedule", "* * * * *", "--command", "echo hi", "--no-sync");
+		expect(exitCode).toBe(0);
+		expect(stderr).toContain("Schedule runs every minute");
+		expect(stderr).toContain("--timeout");
+	});
+
+	test("AC-083: no warning when schedule > 60s", async () => {
+		// Schedule every 5 minutes (interval = 300s)
+		const { stderr, exitCode } = await run("add", "normal-task", "--schedule", "*/5 * * * *", "--command", "echo hi", "--no-sync");
+		expect(exitCode).toBe(0);
+		expect(stderr).not.toContain("Schedule runs every minute");
+	});
+});
+
 // @spec FR-006: Backward compat — .specs/features/013-task-groups-tags/spec.md#fr-006
 describe("backward compatibility — tags", () => {
 	test("AC-014: loads old manifest without tags field", async () => {

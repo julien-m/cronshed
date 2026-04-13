@@ -1,20 +1,19 @@
 # Preflight Report
 
-> Generated: 2026-03-30 | Mode: light (feature pipeline) | Feature: 001-task-manifest
+> Generated: 2026-04-13 | Mode: light (feature pipeline) | Feature: 015-wrapper-protections
 
 ## Summary
 
 | Category | Total | Pass | Failed | Blocked |
 |----------|-------|------|--------|---------|
-| Tooling | 4 | 3 | 1 | 0 |
+| Tooling | 4 | 4 | 0 | 0 |
 | Authentication | 0 | 0 | 0 | 0 |
 | Tokens | 0 | 0 | 0 | 0 |
-| **Total** | **4** | **3** | **1** | **0** |
+| **Total** | **4** | **4** | **0** | **0** |
 
-## Verdict: READY (with warning)
+## Verdict: READY
 
-> `cron-parser` is not installed yet — expected, will be installed in implementation Step 1.
-> No critical failures. Proceeding.
+All checks passed. No warnings.
 
 ## Details
 
@@ -24,5 +23,5 @@
 |-------|--------|---------|--------|
 | Bun runtime | PASS | `bun --version` | 1.3.9 |
 | TypeScript compiler | PASS | `bunx tsc --version` | 5.9.3 |
-| cron-parser | WARN | `bun -e "require('cron-parser')"` | Not installed (expected — install in Step 1) |
+| cron-parser | PASS | `bun -e "require('cron-parser')"` | installed |
 | cc-hub CLI | PASS | `which cc-hub` | /Users/julienm/.bun/bin/cc-hub |

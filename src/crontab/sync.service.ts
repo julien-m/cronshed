@@ -101,8 +101,17 @@ export class SyncService {
 		const tasks = manifest.tasks.filter((t) => t.status === TASK_STATUS.ACTIVE);
 
 		// @spec FR-044: Regenerate wrappers before sync (skip on dry-run) — .specs/features/005-wrapper-script-generation/spec.md#fr-044
+		// @spec FR-086: Pass protection fields to wrapper sync — .specs/features/015-wrapper-protections/spec.md#fr-086
 		if (this.wrapperService && !options.dryRun) {
-			await this.wrapperService.syncWrappers(tasks);
+			const tasksWithConfig = tasks.map((t) => ({
+				name: t.name,
+				command: t.command,
+				notify: t.notify,
+				allowParallel: t.allowParallel,
+				timeout: t.timeout,
+				configPath: this.repo.getPath(),
+			}));
+			await this.wrapperService.syncWrappers(tasksWithConfig);
 		}
 
 		// Build entries with wrapper paths when wrapperService is available
