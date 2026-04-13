@@ -1,11 +1,11 @@
 // @spec FR-036: Wrapper generation, FR-037: Wrapper execution logic, FR-039: Directory creation, FR-040: Wrapper removal, FR-041: Wrapper path — .specs/features/005-wrapper-script-generation/spec.md#fr-036
 // @spec FR-086: Flock injection, FR-089: Timeout tool check, FR-090: Timeout wrapping, FR-097: PID in lock, FR-098: Lock hash — .specs/features/015-wrapper-protections/spec.md#fr-086
 
+import { chmod, mkdir, readdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import { mkdir, chmod, unlink, readdir } from "node:fs/promises";
+import { TimeoutToolMissingError, WrapperGenerationError } from "./wrapper.errors";
 import type { WrapperConfig } from "./wrapper.types";
 import { MAX_OUTPUT_BYTES, NOTIFY_STDERR_MAX_CHARS } from "./wrapper.types";
-import { WrapperGenerationError, TimeoutToolMissingError } from "./wrapper.errors";
 
 /**
  * Static bash body for wrapper scripts.
@@ -70,7 +70,7 @@ const WRAPPER_SCRIPT_BODY = [
 
 /** Standard log printf without timedOut field. */
 const STANDARD_LOG_PRINTF =
-	"printf '{\"timestamp\":\"%s\",\"exitCode\":%d,\"durationMs\":%d,\"stdout\":%s,\"stderr\":%s}\\n' \"$_timestamp\" \"$_exit_code\" \"$_duration_ms\" \"$_stdout_json\" \"$_stderr_json\" >> \"$CRONSHED_LOG_FILE\"";
+	'printf \'{"timestamp":"%s","exitCode":%d,"durationMs":%d,"stdout":%s,"stderr":%s}\\n\' "$_timestamp" "$_exit_code" "$_duration_ms" "$_stdout_json" "$_stderr_json" >> "$CRONSHED_LOG_FILE"';
 
 /**
  * Log printf with timedOut field when timeout is configured.
@@ -79,9 +79,9 @@ const STANDARD_LOG_PRINTF =
 // prettier-ignore
 const TIMEOUT_LOG_PRINTF = [
 	'if [ "$_exit_code" -eq 124 ] && [ -n "$CRONSHED_TIMEOUT_CMD" ]; then',
-	"  printf '{\"timestamp\":\"%s\",\"exitCode\":%d,\"durationMs\":%d,\"stdout\":%s,\"stderr\":%s,\"timedOut\":true}\\n' \"$_timestamp\" \"$_exit_code\" \"$_duration_ms\" \"$_stdout_json\" \"$_stderr_json\" >> \"$CRONSHED_LOG_FILE\"",
+	'  printf \'{"timestamp":"%s","exitCode":%d,"durationMs":%d,"stdout":%s,"stderr":%s,"timedOut":true}\\n\' "$_timestamp" "$_exit_code" "$_duration_ms" "$_stdout_json" "$_stderr_json" >> "$CRONSHED_LOG_FILE"',
 	"else",
-	"  printf '{\"timestamp\":\"%s\",\"exitCode\":%d,\"durationMs\":%d,\"stdout\":%s,\"stderr\":%s}\\n' \"$_timestamp\" \"$_exit_code\" \"$_duration_ms\" \"$_stdout_json\" \"$_stderr_json\" >> \"$CRONSHED_LOG_FILE\"",
+	'  printf \'{"timestamp":"%s","exitCode":%d,"durationMs":%d,"stdout":%s,"stderr":%s}\\n\' "$_timestamp" "$_exit_code" "$_duration_ms" "$_stdout_json" "$_stderr_json" >> "$CRONSHED_LOG_FILE"',
 	"fi",
 ].join("\n");
 
@@ -117,7 +117,7 @@ const NOTIFY_BLOCK = [
 const FLOCK_SKIP_BLOCK = [
 	'    _pid_holder=$(lsof -t "$CRONSHED_LOCK_FILE" 2>/dev/null | head -1)',
 	'    _skipped_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")',
-	"    printf '{\"timestamp\":\"%s\",\"exitCode\":0,\"skipped\":true,\"skippedAt\":\"%s\",\"reason\":\"already running\",\"pidHolder\":%s}\\n' \\",
+	'    printf \'{"timestamp":"%s","exitCode":0,"skipped":true,"skippedAt":"%s","reason":"already running","pidHolder":%s}\\n\' \\',
 	'      "$_skipped_at" "$_skipped_at" "${_pid_holder:-0}" >> "$CRONSHED_LOG_FILE"',
 	"    exit 0",
 ].join("\n");
@@ -192,10 +192,7 @@ export class WrapperService {
 			await chmod(wrapperPath, 0o755);
 		} catch (err) {
 			if (err instanceof TimeoutToolMissingError) throw err;
-			throw new WrapperGenerationError(
-				task.name,
-				err instanceof Error ? err : undefined,
-			);
+			throw new WrapperGenerationError(task.name, err instanceof Error ? err : undefined);
 		}
 
 		return wrapperPath;
@@ -222,14 +219,16 @@ export class WrapperService {
 	 */
 	// @spec FR-044: Sync regenerates wrappers — .specs/features/005-wrapper-script-generation/spec.md#fr-044
 	// @spec FR-086: Sync passes protection fields — .specs/features/015-wrapper-protections/spec.md#fr-086
-	async syncWrappers(tasks: {
-		name: string;
-		command: string;
-		notify?: boolean;
-		allowParallel?: boolean;
-		timeout?: string;
-		configPath?: string;
-	}[]): Promise<void> {
+	async syncWrappers(
+		tasks: {
+			name: string;
+			command: string;
+			notify?: boolean;
+			allowParallel?: boolean;
+			timeout?: string;
+			configPath?: string;
+		}[],
+	): Promise<void> {
 		for (const task of tasks) {
 			await this.generate(task);
 		}
@@ -271,7 +270,18 @@ export class WrapperService {
 	// @spec FR-037: Wrapper script content — .specs/features/005-wrapper-script-generation/spec.md#fr-037
 	// @spec FR-086: Flock block, FR-090: Timeout wrapping, FR-091: timedOut field — .specs/features/015-wrapper-protections/spec.md#fr-086
 	buildScript(config: WrapperConfig): string {
-		const { taskName, command, logPath, maxOutputBytes, notify, allowParallel, timeout, lockFilePath, locksDir, flockPath } = config;
+		const {
+			taskName,
+			command,
+			logPath,
+			maxOutputBytes,
+			notify,
+			allowParallel,
+			timeout,
+			lockFilePath,
+			locksDir,
+			flockPath,
+		} = config;
 		const logsDir = this.logsDir;
 		const timestamp = new Date().toISOString();
 
@@ -298,23 +308,20 @@ export class WrapperService {
 		script += "\n";
 
 		// Build the command invocation (with or without timeout wrapping)
-		const actualCommand = timeout
-			? `$CRONSHED_TIMEOUT_CMD $CRONSHED_TIMEOUT_SECS ${command}`
-			: command;
+		const actualCommand = timeout ? `$CRONSHED_TIMEOUT_CMD --foreground $CRONSHED_TIMEOUT_SECS ${command}` : command;
 
 		// Build the log printf (with or without timedOut check)
 		const logPrintf = timeout ? TIMEOUT_LOG_PRINTF : STANDARD_LOG_PRINTF;
 
 		// Core body with command and log substitution
-		let body = WRAPPER_SCRIPT_BODY
-			.replace("{{COMMAND}}", actualCommand)
-			.replace("{{LOG_PRINTF}}", logPrintf);
+		let body = WRAPPER_SCRIPT_BODY.replace("{{COMMAND}}", actualCommand).replace("{{LOG_PRINTF}}", logPrintf);
 
 		// Insert notification block before cleanup when notify enabled
 		if (notify) {
-			const notifyBlock = NOTIFY_BLOCK
-				.replace(/\{\{TASK_NAME\}\}/g, taskName)
-				.replace(/\{\{NOTIFY_MAX\}\}/g, String(NOTIFY_STDERR_MAX_CHARS));
+			const notifyBlock = NOTIFY_BLOCK.replace(/\{\{TASK_NAME\}\}/g, taskName).replace(
+				/\{\{NOTIFY_MAX\}\}/g,
+				String(NOTIFY_STDERR_MAX_CHARS),
+			);
 			body = body.replace(
 				'rm -f "$_stdout_file" "$_stderr_file"',
 				notifyBlock + '\nrm -f "$_stdout_file" "$_stderr_file"',

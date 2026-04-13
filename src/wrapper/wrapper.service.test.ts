@@ -1,10 +1,10 @@
-import { test, expect, describe, beforeEach, afterEach } from "bun:test";
-import { join } from "node:path";
-import { mkdtemp, rm, readdir, stat } from "node:fs/promises";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { WrapperService, computeLockHash, detectTimeoutTool } from "./wrapper.service";
-import { MAX_OUTPUT_BYTES } from "./wrapper.types";
+import { join } from "node:path";
 import { TimeoutToolMissingError } from "./wrapper.errors";
+import { computeLockHash, detectTimeoutTool, WrapperService } from "./wrapper.service";
+import { MAX_OUTPUT_BYTES } from "./wrapper.types";
 
 describe("WrapperService", () => {
 	let dataDir: string;
@@ -231,7 +231,7 @@ describe("WrapperService", () => {
 
 			expect(script).toContain('CRONSHED_TIMEOUT_CMD="gtimeout"');
 			expect(script).toContain("CRONSHED_TIMEOUT_SECS=300");
-			expect(script).toContain("$CRONSHED_TIMEOUT_CMD $CRONSHED_TIMEOUT_SECS make build");
+			expect(script).toContain("$CRONSHED_TIMEOUT_CMD --foreground $CRONSHED_TIMEOUT_SECS make build");
 		});
 
 		test("does NOT include timeout wrapping when no timeout", () => {
@@ -292,7 +292,7 @@ describe("WrapperService", () => {
 			});
 
 			expect(script).toContain("/usr/bin/flock -n 9");
-			expect(script).toContain("$CRONSHED_TIMEOUT_CMD $CRONSHED_TIMEOUT_SECS make build");
+			expect(script).toContain("$CRONSHED_TIMEOUT_CMD --foreground $CRONSHED_TIMEOUT_SECS make build");
 			expect(script).toContain('"timedOut":true');
 		});
 
@@ -493,9 +493,9 @@ describe("WrapperService", () => {
 			process.env.PATH = emptyDir;
 
 			try {
-				await expect(
-					service.generate({ name: "ratio-task", command: "echo hi", timeout: "30s" }),
-				).rejects.toThrow("timeout");
+				await expect(service.generate({ name: "ratio-task", command: "echo hi", timeout: "30s" })).rejects.toThrow(
+					"timeout",
+				);
 			} finally {
 				process.env.PATH = origPath;
 				await rm(emptyDir, { recursive: true, force: true });
@@ -519,7 +519,7 @@ describe("WrapperService", () => {
 
 			expect(script).toContain("CRONSHED_TIMEOUT_SECS=240");
 			expect(script).toContain('CRONSHED_TIMEOUT_CMD="gtimeout"');
-			expect(script).toContain("$CRONSHED_TIMEOUT_CMD $CRONSHED_TIMEOUT_SECS make build");
+			expect(script).toContain("$CRONSHED_TIMEOUT_CMD --foreground $CRONSHED_TIMEOUT_SECS make build");
 		});
 
 		test("AC-087: explicit --timeout takes precedence over default-timeout-ratio", () => {
@@ -536,7 +536,7 @@ describe("WrapperService", () => {
 
 			expect(script).toContain("CRONSHED_TIMEOUT_SECS=30");
 			expect(script).not.toContain("CRONSHED_TIMEOUT_SECS=240");
-			expect(script).toContain("$CRONSHED_TIMEOUT_CMD $CRONSHED_TIMEOUT_SECS make build");
+			expect(script).toContain("$CRONSHED_TIMEOUT_CMD --foreground $CRONSHED_TIMEOUT_SECS make build");
 		});
 
 		test("AC-086: minimum auto-timeout is 10s (ratio yields less than 10)", () => {
