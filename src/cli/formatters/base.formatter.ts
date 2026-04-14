@@ -7,10 +7,18 @@ export function supportsColor(): boolean {
 	return process.env.NO_COLOR === undefined || process.env.NO_COLOR === "";
 }
 
-export function ANSI_GREEN(): string { return supportsColor() ? "\x1b[32m" : ""; }
-export function ANSI_RED(): string { return supportsColor() ? "\x1b[31m" : ""; }
-export function ANSI_YELLOW(): string { return supportsColor() ? "\x1b[33m" : ""; }
-export function ANSI_RESET(): string { return supportsColor() ? "\x1b[0m" : ""; }
+export function ANSI_GREEN(): string {
+	return supportsColor() ? "\x1b[32m" : "";
+}
+export function ANSI_RED(): string {
+	return supportsColor() ? "\x1b[31m" : "";
+}
+export function ANSI_YELLOW(): string {
+	return supportsColor() ? "\x1b[33m" : "";
+}
+export function ANSI_RESET(): string {
+	return supportsColor() ? "\x1b[0m" : "";
+}
 
 /**
  * Format a success message prefixed with ✓ in green.
@@ -100,7 +108,7 @@ export function truncateOutput(str: string, maxLen: number): string {
 	if (cleaned.length <= maxLen) {
 		return cleaned;
 	}
-	return cleaned.slice(0, maxLen) + "...";
+	return `${cleaned.slice(0, maxLen)}...`;
 }
 
 /**

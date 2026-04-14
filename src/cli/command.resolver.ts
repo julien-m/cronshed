@@ -1,14 +1,10 @@
 // @spec FR-011: Path detection, FR-012: Path resolution, FR-013: Existence check, FR-014: Permission check, FR-015: Store resolved — .specs/features/002-command-path-resolution/spec.md#fr-011
 
-import { resolve } from "node:path";
-import { homedir } from "node:os";
-import { access, stat } from "node:fs/promises";
 import { constants } from "node:fs";
-import {
-	CommandFileNotFoundError,
-	CommandFileNotExecutableError,
-	CommandPathIsDirectoryError,
-} from "./command.errors";
+import { access, stat } from "node:fs/promises";
+import { homedir } from "node:os";
+import { resolve } from "node:path";
+import { CommandFileNotExecutableError, CommandFileNotFoundError, CommandPathIsDirectoryError } from "./command.errors";
 
 /** Result of resolving a command string. */
 export interface CommandResolution {

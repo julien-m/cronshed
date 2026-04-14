@@ -1,8 +1,8 @@
 // @spec FR-093: Config CLI commands — .specs/features/015-wrapper-protections/spec.md#fr-093
 
-import { ConfigService, InvalidConfigKeyError, InvalidConfigValueError } from "../../config/config.service";
 import { ConfigRepository } from "../../config/config.repository";
-import { formatSuccess, formatError } from "../formatters/base.formatter";
+import { ConfigService, InvalidConfigKeyError, InvalidConfigValueError } from "../../config/config.service";
+import { formatError, formatSuccess } from "../formatters/base.formatter";
 
 /**
  * Handle `cronshed config <subcommand>` dispatching.
@@ -21,10 +21,9 @@ export async function handleConfig(args: string[]): Promise<void> {
 		return;
 	}
 
-	console.error(formatError(
-		"Unknown config subcommand",
-		"Usage: cronshed config set <key> <value> | cronshed config get <key>",
-	));
+	console.error(
+		formatError("Unknown config subcommand", "Usage: cronshed config set <key> <value> | cronshed config get <key>"),
+	);
 	process.exit(2);
 }
 
@@ -36,10 +35,7 @@ async function handleConfigSet(args: string[]): Promise<void> {
 	const value = args[1];
 
 	if (!key || !value) {
-		console.error(formatError(
-			"Missing arguments",
-			"Usage: cronshed config set <key> <value>",
-		));
+		console.error(formatError("Missing arguments", "Usage: cronshed config set <key> <value>"));
 		process.exit(2);
 		return;
 	}
@@ -67,10 +63,7 @@ async function handleConfigGet(args: string[]): Promise<void> {
 	const key = args[0];
 
 	if (!key) {
-		console.error(formatError(
-			"Missing key argument",
-			"Usage: cronshed config get <key>",
-		));
+		console.error(formatError("Missing key argument", "Usage: cronshed config get <key>"));
 		process.exit(2);
 		return;
 	}

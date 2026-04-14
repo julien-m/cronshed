@@ -2,6 +2,7 @@
 // @spec FR-029, FR-030, FR-031, FR-032, FR-033, FR-034: Mutation auto-sync — .specs/features/004-auto-sync/spec.md#fr-029
 // @spec FR-088: Protection flags on add/update — .specs/features/015-wrapper-protections/spec.md#fr-088
 
+import { parseArgs } from "node:util";
 import { getDataDir, getTasksPath } from "../../app/config";
 import { ConfigRepository } from "../../config/config.repository";
 import { ConfigService } from "../../config/config.service";
@@ -10,7 +11,6 @@ import type { TaskRepository } from "../../task/task.repository";
 import type { TaskService } from "../../task/task.service";
 import { parseDuration } from "../../wrapper/duration";
 import { detectTimeoutTool, WrapperService } from "../../wrapper/wrapper.service";
-import { parseArgs } from "node:util";
 import { resolveCommand } from "../command.resolver";
 import { formatError, formatSuccess, formatWarning } from "../formatters/base.formatter";
 import { autoSync } from "./shared";
@@ -63,11 +63,15 @@ export async function handleAdd(args: string[], service: TaskService, repo: Task
 	});
 
 	if (!values.schedule) {
-		console.error(formatError("Missing --schedule flag", "Usage: cronshed add <name> --schedule '<cron>' --command '<cmd>'"));
+		console.error(
+			formatError("Missing --schedule flag", "Usage: cronshed add <name> --schedule '<cron>' --command '<cmd>'"),
+		);
 		process.exit(2);
 	}
 	if (!values.command) {
-		console.error(formatError("Missing --command flag", "Usage: cronshed add <name> --schedule '<cron>' --command '<cmd>'"));
+		console.error(
+			formatError("Missing --command flag", "Usage: cronshed add <name> --schedule '<cron>' --command '<cmd>'"),
+		);
 		process.exit(2);
 	}
 	const schedule = values.schedule;
@@ -143,7 +147,9 @@ export async function handleAdd(args: string[], service: TaskService, repo: Task
 export async function handleUpdate(args: string[], service: TaskService, repo: TaskRepository): Promise<void> {
 	const name = args[0];
 	if (!name) {
-		console.error(formatError("Missing task name", "Usage: cronshed update <name> --schedule '<cron>' --command '<cmd>'"));
+		console.error(
+			formatError("Missing task name", "Usage: cronshed update <name> --schedule '<cron>' --command '<cmd>'"),
+		);
 		process.exit(2);
 		return;
 	}
@@ -184,10 +190,15 @@ export async function handleUpdate(args: string[], service: TaskService, repo: T
 	const notifyValue = values.notify === true ? true : values["no-notify"] === true ? false : undefined;
 
 	// Resolve allowParallel: --allow-parallel wins over --no-allow-parallel
-	const allowParallelValue = values["allow-parallel"] === true ? true : values["no-allow-parallel"] === true ? false : undefined;
+	const allowParallelValue =
+		values["allow-parallel"] === true ? true : values["no-allow-parallel"] === true ? false : undefined;
 
 	// Resolve timeout: --timeout <value> sets it, --no-timeout clears it, undefined if neither
-	const timeoutValue: string | null | undefined = values.timeout ? values.timeout : values["no-timeout"] === true ? null : undefined;
+	const timeoutValue: string | null | undefined = values.timeout
+		? values.timeout
+		: values["no-timeout"] === true
+			? null
+			: undefined;
 
 	// @spec FR-089: Check timeout tool availability on update — .specs/features/015-wrapper-protections/spec.md#fr-089
 	if (timeoutValue && timeoutValue !== null) {
@@ -205,7 +216,8 @@ export async function handleUpdate(args: string[], service: TaskService, repo: T
 	});
 
 	// @spec FR-042: Regenerate wrapper on command, notify, or protection change — .specs/features/005-wrapper-script-generation/spec.md#fr-042
-	const shouldRegenerate = values.command || notifyValue !== undefined || allowParallelValue !== undefined || timeoutValue !== undefined;
+	const shouldRegenerate =
+		values.command || notifyValue !== undefined || allowParallelValue !== undefined || timeoutValue !== undefined;
 	if (shouldRegenerate) {
 		const wrapperService = new WrapperService(getDataDir());
 		await wrapperService.generate({

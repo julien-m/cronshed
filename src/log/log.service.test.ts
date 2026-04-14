@@ -1,22 +1,22 @@
-import { test, expect, describe, beforeEach, afterEach } from "bun:test";
-import { getLastExecution, getExecutionHistory } from "./log.service";
-import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { getExecutionHistory, getLastExecution } from "./log.service";
 
 let tempDir: string;
-const originalEnv = process.env["CRONSHED_HOME"];
+const originalEnv = process.env.CRONSHED_HOME;
 
 beforeEach(async () => {
 	tempDir = await mkdtemp(join(tmpdir(), "cronshed-log-test-"));
-	process.env["CRONSHED_HOME"] = tempDir;
+	process.env.CRONSHED_HOME = tempDir;
 });
 
 afterEach(async () => {
 	if (originalEnv === undefined) {
-		delete process.env["CRONSHED_HOME"];
+		delete process.env.CRONSHED_HOME;
 	} else {
-		process.env["CRONSHED_HOME"] = originalEnv;
+		process.env.CRONSHED_HOME = originalEnv;
 	}
 	await rm(tempDir, { recursive: true, force: true });
 });
@@ -26,10 +26,12 @@ async function writeLogFile(taskName: string, lines: string[]): Promise<void> {
 	const { mkdir } = await import("node:fs/promises");
 	await mkdir(logsDir, { recursive: true });
 	const logPath = join(logsDir, `${taskName}.jsonl`);
-	await Bun.write(logPath, lines.join("\n") + "\n");
+	await Bun.write(logPath, `${lines.join("\n")}\n`);
 }
 
-function makeLogEntry(overrides?: Partial<{ timestamp: string; exitCode: number; durationMs: number; stdout: string; stderr: string }>): string {
+function makeLogEntry(
+	overrides?: Partial<{ timestamp: string; exitCode: number; durationMs: number; stdout: string; stderr: string }>,
+): string {
 	return JSON.stringify({
 		timestamp: "2026-03-30T02:00:05Z",
 		exitCode: 0,
@@ -53,9 +55,9 @@ describe("getLastExecution", () => {
 		const result = await getLastExecution("backup-db");
 
 		expect(result).not.toBeNull();
-		expect(result!.timestamp).toBe("2026-03-30T02:00:05Z");
-		expect(result!.exitCode).toBe(0);
-		expect(result!.durationMs).toBe(1500);
+		expect(result?.timestamp).toBe("2026-03-30T02:00:05Z");
+		expect(result?.exitCode).toBe(0);
+		expect(result?.durationMs).toBe(1500);
 	});
 
 	test("AC-009: returns entry with non-zero exit code", async () => {
@@ -66,7 +68,7 @@ describe("getLastExecution", () => {
 		const result = await getLastExecution("sync-files");
 
 		expect(result).not.toBeNull();
-		expect(result!.exitCode).toBe(1);
+		expect(result?.exitCode).toBe(1);
 	});
 
 	// @spec AC-010: returns null when log file does not exist or is empty
@@ -97,15 +99,11 @@ describe("getLastExecution", () => {
 		const result = await getLastExecution("bad-task");
 
 		expect(result).not.toBeNull();
-		expect(result!.timestamp).toBe("2026-03-29T02:00:05Z");
+		expect(result?.timestamp).toBe("2026-03-29T02:00:05Z");
 	});
 
 	test("AC-011: returns null when all lines are corrupted", async () => {
-		await writeLogFile("all-bad", [
-			"not json at all",
-			"also not json",
-			"{invalid json too",
-		]);
+		await writeLogFile("all-bad", ["not json at all", "also not json", "{invalid json too"]);
 
 		const result = await getLastExecution("all-bad");
 		expect(result).toBeNull();
@@ -120,7 +118,7 @@ describe("getLastExecution", () => {
 		const result = await getLastExecution("partial-fields");
 
 		expect(result).not.toBeNull();
-		expect(result!.timestamp).toBe("2026-03-28T02:00:05Z");
+		expect(result?.timestamp).toBe("2026-03-28T02:00:05Z");
 	});
 });
 
@@ -138,11 +136,11 @@ describe("getExecutionHistory", () => {
 		const result = await getExecutionHistory("backup-db");
 
 		expect(result).toHaveLength(3);
-		expect(result[0]!.timestamp).toBe("2026-03-28T02:00:05Z");
-		expect(result[1]!.timestamp).toBe("2026-03-29T02:00:05Z");
-		expect(result[2]!.timestamp).toBe("2026-03-30T02:00:05Z");
-		expect(result[2]!.exitCode).toBe(1);
-		expect(result[2]!.durationMs).toBe(500);
+		expect(result[0]?.timestamp).toBe("2026-03-28T02:00:05Z");
+		expect(result[1]?.timestamp).toBe("2026-03-29T02:00:05Z");
+		expect(result[2]?.timestamp).toBe("2026-03-30T02:00:05Z");
+		expect(result[2]?.exitCode).toBe(1);
+		expect(result[2]?.durationMs).toBe(500);
 	});
 
 	test("AC-001: entries include stdout and stderr fields", async () => {
@@ -153,8 +151,8 @@ describe("getExecutionHistory", () => {
 		const result = await getExecutionHistory("backup-db");
 
 		expect(result).toHaveLength(1);
-		expect(result[0]!.stdout).toBe("ok");
-		expect(result[0]!.stderr).toBe("");
+		expect(result[0]?.stdout).toBe("ok");
+		expect(result[0]?.stderr).toBe("");
 	});
 
 	test("AC-010: returns empty array when log file does not exist", async () => {
@@ -182,16 +180,12 @@ describe("getExecutionHistory", () => {
 		const result = await getExecutionHistory("mixed-task");
 
 		expect(result).toHaveLength(2);
-		expect(result[0]!.timestamp).toBe("2026-03-28T02:00:05Z");
-		expect(result[1]!.timestamp).toBe("2026-03-30T02:00:05Z");
+		expect(result[0]?.timestamp).toBe("2026-03-28T02:00:05Z");
+		expect(result[1]?.timestamp).toBe("2026-03-30T02:00:05Z");
 	});
 
 	test("AC-011: returns empty array when all lines are corrupted", async () => {
-		await writeLogFile("all-bad", [
-			"not json at all",
-			"also not json",
-			"{invalid json too",
-		]);
+		await writeLogFile("all-bad", ["not json at all", "also not json", "{invalid json too"]);
 
 		const result = await getExecutionHistory("all-bad");
 		expect(result).toEqual([]);
@@ -205,7 +199,7 @@ describe("getExecutionHistory", () => {
 		const result = await getExecutionHistory("no-output");
 
 		expect(result).toHaveLength(1);
-		expect(result[0]!.stdout).toBe("");
-		expect(result[0]!.stderr).toBe("");
+		expect(result[0]?.stdout).toBe("");
+		expect(result[0]?.stderr).toBe("");
 	});
 });

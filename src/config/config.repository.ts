@@ -1,7 +1,7 @@
 // @spec FR-092: Config persistence — .specs/features/015-wrapper-protections/spec.md#fr-092
 
-import { join, dirname } from "node:path";
 import { mkdir } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { getDataDir } from "../app/config";
 import type { CronshedConfig } from "./config.types";
 
@@ -39,7 +39,7 @@ export class ConfigRepository {
 	async save(config: CronshedConfig): Promise<void> {
 		const dir = dirname(this.configPath);
 		await mkdir(dir, { recursive: true });
-		await Bun.write(this.configPath, JSON.stringify(config, null, "\t") + "\n");
+		await Bun.write(this.configPath, `${JSON.stringify(config, null, "\t")}\n`);
 	}
 
 	/** Get the resolved path to the config file. */

@@ -1,10 +1,10 @@
-import { test, expect, describe, beforeEach } from "bun:test";
-import { TaskRepository } from "./task.repository";
-import { ManifestCorruptedError, ManifestVersionError } from "./task.errors";
-import type { TaskManifest } from "./task.types";
-import { join } from "node:path";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ManifestCorruptedError, ManifestVersionError } from "./task.errors";
+import { TaskRepository } from "./task.repository";
+import type { TaskManifest } from "./task.types";
 
 let tmpDir: string;
 let tasksPath: string;
@@ -57,7 +57,7 @@ describe("TaskRepository.load", () => {
 		await Bun.write(tasksPath, JSON.stringify(data));
 		const manifest = await repo.load();
 		expect(manifest.tasks).toHaveLength(1);
-		expect(manifest.tasks[0]!.name).toBe("test-task");
+		expect(manifest.tasks[0]?.name).toBe("test-task");
 	});
 
 	test("backward compat: loads task without notify field and defaults to false", async () => {
@@ -76,7 +76,7 @@ describe("TaskRepository.load", () => {
 		};
 		await Bun.write(tasksPath, JSON.stringify(data));
 		const manifest = await repo.load();
-		expect(manifest.tasks[0]!.notify).toBe(false);
+		expect(manifest.tasks[0]?.notify).toBe(false);
 	});
 });
 
@@ -110,7 +110,7 @@ describe("TaskRepository.save", () => {
 
 		await repo.save(manifest);
 		const loaded = await repo.load();
-		expect(loaded.tasks[0]!.name).toBe("atomic");
+		expect(loaded.tasks[0]?.name).toBe("atomic");
 	});
 
 	test("AC-019: saving empty tasks array produces valid manifest", async () => {

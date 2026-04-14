@@ -1,10 +1,5 @@
-import { test, expect, describe } from "bun:test";
-import {
-	parseUserLine,
-	generateTaskName,
-	resolveNameConflict,
-	importCrontabEntries,
-} from "./import.service";
+import { describe, expect, test } from "bun:test";
+import { generateTaskName, importCrontabEntries, parseUserLine, resolveNameConflict } from "./import.service";
 
 // --- parseUserLine ---
 
@@ -160,17 +155,14 @@ describe("resolveNameConflict", () => {
 
 describe("importCrontabEntries", () => {
 	test("AC-001: imports valid cron entries", () => {
-		const userLines = [
-			"0 * * * * /usr/local/bin/backup.sh",
-			"30 2 * * * /opt/scripts/cleanup.py",
-		];
+		const userLines = ["0 * * * * /usr/local/bin/backup.sh", "30 2 * * * /opt/scripts/cleanup.py"];
 		const result = importCrontabEntries(userLines, new Set(), { dryRun: false });
 		expect(result.imported).toHaveLength(2);
-		expect(result.imported[0]!.name).toBe("backup");
-		expect(result.imported[0]!.schedule).toBe("0 * * * *");
-		expect(result.imported[0]!.command).toBe("/usr/local/bin/backup.sh");
-		expect(result.imported[1]!.name).toBe("cleanup");
-		expect(result.imported[1]!.schedule).toBe("30 2 * * *");
+		expect(result.imported[0]?.name).toBe("backup");
+		expect(result.imported[0]?.schedule).toBe("0 * * * *");
+		expect(result.imported[0]?.command).toBe("/usr/local/bin/backup.sh");
+		expect(result.imported[1]?.name).toBe("cleanup");
+		expect(result.imported[1]?.schedule).toBe("30 2 * * *");
 	});
 
 	test("AC-014: returns empty imported for empty input", () => {
@@ -180,15 +172,10 @@ describe("importCrontabEntries", () => {
 	});
 
 	test("AC-004: skips comments and empty lines", () => {
-		const userLines = [
-			"# Crontab header",
-			"",
-			"0 * * * * /usr/bin/task",
-			"  ",
-		];
+		const userLines = ["# Crontab header", "", "0 * * * * /usr/bin/task", "  "];
 		const result = importCrontabEntries(userLines, new Set(), { dryRun: false });
 		expect(result.imported).toHaveLength(1);
-		expect(result.imported[0]!.name).toBe("task");
+		expect(result.imported[0]?.name).toBe("task");
 	});
 
 	test("AC-004: skips environment variable lines", () => {
@@ -201,34 +188,28 @@ describe("importCrontabEntries", () => {
 		const result = importCrontabEntries(userLines, new Set(), { dryRun: false });
 		expect(result.imported).toHaveLength(1);
 		expect(result.skipped).toHaveLength(3);
-		expect(result.skipped[0]!.reason).toBe("Environment variable");
+		expect(result.skipped[0]?.reason).toBe("Environment variable");
 	});
 
 	test("AC-008: resolves conflict with existing tasks", () => {
 		const userLines = ["0 * * * * /usr/bin/backup.sh"];
 		const existing = new Set(["backup"]);
 		const result = importCrontabEntries(userLines, existing, { dryRun: false });
-		expect(result.imported[0]!.name).toBe("backup-2");
+		expect(result.imported[0]?.name).toBe("backup-2");
 	});
 
 	test("AC-009: resolves conflicts within same import batch", () => {
-		const userLines = [
-			"0 * * * * /opt/a/backup.sh",
-			"30 * * * * /opt/b/backup.sh",
-		];
+		const userLines = ["0 * * * * /opt/a/backup.sh", "30 * * * * /opt/b/backup.sh"];
 		const result = importCrontabEntries(userLines, new Set(), { dryRun: false });
-		expect(result.imported[0]!.name).toBe("backup");
-		expect(result.imported[1]!.name).toBe("backup-2");
+		expect(result.imported[0]?.name).toBe("backup");
+		expect(result.imported[1]?.name).toBe("backup-2");
 	});
 
 	test("AC-007: applies prefix to all generated names", () => {
-		const userLines = [
-			"0 * * * * /usr/bin/backup.sh",
-			"30 * * * * curl https://example.com",
-		];
+		const userLines = ["0 * * * * /usr/bin/backup.sh", "30 * * * * curl https://example.com"];
 		const result = importCrontabEntries(userLines, new Set(), { dryRun: false, prefix: "imported" });
-		expect(result.imported[0]!.name).toBe("imported-backup");
-		expect(result.imported[1]!.name).toBe("imported-curl");
+		expect(result.imported[0]?.name).toBe("imported-backup");
+		expect(result.imported[1]?.name).toBe("imported-curl");
 	});
 
 	test("carries dryRun flag through to result", () => {
@@ -237,10 +218,7 @@ describe("importCrontabEntries", () => {
 	});
 
 	test("AC-015: skips lines with invalid cron expressions", () => {
-		const userLines = [
-			"not a valid cron expression at all",
-			"0 * * * * /usr/bin/valid-task",
-		];
+		const userLines = ["not a valid cron expression at all", "0 * * * * /usr/bin/valid-task"];
 		const result = importCrontabEntries(userLines, new Set(), { dryRun: false });
 		expect(result.imported).toHaveLength(1);
 		expect(result.skipped.some((s) => s.reason === "Invalid cron format")).toBe(true);
@@ -249,7 +227,7 @@ describe("importCrontabEntries", () => {
 	test("preserves original line in imported entries", () => {
 		const userLines = ["0 * * * * /usr/local/bin/backup.sh"];
 		const result = importCrontabEntries(userLines, new Set(), { dryRun: false });
-		expect(result.imported[0]!.originalLine).toBe("0 * * * * /usr/local/bin/backup.sh");
+		expect(result.imported[0]?.originalLine).toBe("0 * * * * /usr/local/bin/backup.sh");
 	});
 
 	test("mixed content: imports only valid cron entries", () => {
@@ -264,7 +242,7 @@ describe("importCrontabEntries", () => {
 		];
 		const result = importCrontabEntries(userLines, new Set(), { dryRun: false });
 		expect(result.imported).toHaveLength(2);
-		expect(result.imported[0]!.name).toBe("hourly-task");
-		expect(result.imported[1]!.name).toBe("daily-backup");
+		expect(result.imported[0]?.name).toBe("hourly-task");
+		expect(result.imported[1]?.name).toBe("daily-backup");
 	});
 });

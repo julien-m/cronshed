@@ -1,8 +1,8 @@
 // @spec FR-092: Config get/set with validation — .specs/features/015-wrapper-protections/spec.md#fr-092
 
-import { ConfigRepository } from "./config.repository";
-import { VALID_CONFIG_KEYS, CONFIG_KEY_MAP } from "./config.types";
+import type { ConfigRepository } from "./config.repository";
 import type { ConfigKey } from "./config.types";
+import { CONFIG_KEY_MAP, VALID_CONFIG_KEYS } from "./config.types";
 
 /** Error thrown when an unknown config key is used. */
 export class InvalidConfigKeyError extends Error {
@@ -15,9 +15,6 @@ export class InvalidConfigKeyError extends Error {
 /** Error thrown when a config value fails validation. */
 export class InvalidConfigValueError extends Error {
 	override readonly name = "InvalidConfigValueError";
-	constructor(message: string) {
-		super(message);
-	}
 }
 
 export class ConfigService {
@@ -51,7 +48,7 @@ export class ConfigService {
 
 		if (key === "default-timeout-ratio") {
 			const ratio = parseFloat(value);
-			if (isNaN(ratio) || ratio <= 0 || ratio > 1) {
+			if (Number.isNaN(ratio) || ratio <= 0 || ratio > 1) {
 				throw new InvalidConfigValueError(
 					`default-timeout-ratio must be between 0 and 1 (exclusive 0, inclusive 1). Got: ${value}`,
 				);

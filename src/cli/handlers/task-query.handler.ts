@@ -2,14 +2,14 @@
 // @spec FR-007: Enrich tasks in list, FR-008: Enrich task in get — .specs/features/006-task-listing-status/spec.md#fr-007
 
 import { parseArgs } from "node:util";
-import { TaskService } from "../../task/task.service";
 import { getNextExecution } from "../../cron/cron.service";
-import { getLastExecution, getExecutionHistory } from "../../log/log.service";
-import type { Task, EnrichedTask } from "../../task/task.types";
+import { getExecutionHistory, getLastExecution } from "../../log/log.service";
+import type { TaskService } from "../../task/task.service";
+import type { EnrichedTask, Task } from "../../task/task.types";
 import { TASK_STATUS } from "../../task/task.types";
-import { formatTaskTable, formatTaskDetails, formatHistoryTable } from "../formatters/task.formatter";
-import { formatTagsTable } from "../formatters/ops.formatter";
 import { formatError } from "../formatters/base.formatter";
+import { formatTagsTable } from "../formatters/ops.formatter";
+import { formatHistoryTable, formatTaskDetails, formatTaskTable } from "../formatters/task.formatter";
 
 /**
  * Enrich a single task with last execution and next run data.
@@ -20,9 +20,7 @@ import { formatError } from "../formatters/base.formatter";
  */
 export async function enrichTask(task: Task): Promise<EnrichedTask> {
 	const lastExec = await getLastExecution(task.name);
-	const nextRun = task.status === TASK_STATUS.PAUSED
-		? "\u2014"
-		: getNextExecution(task.schedule).toISOString();
+	const nextRun = task.status === TASK_STATUS.PAUSED ? "\u2014" : getNextExecution(task.schedule).toISOString();
 
 	return {
 		...task,
@@ -140,7 +138,7 @@ export async function handleHistory(args: string[], service: TaskService): Promi
 	});
 
 	const limit = values.limit !== undefined ? parseInt(values.limit, 10) : DEFAULT_HISTORY_LIMIT;
-	if (isNaN(limit) || limit < 0) {
+	if (Number.isNaN(limit) || limit < 0) {
 		console.error(formatError("Invalid --limit value", "Must be a non-negative integer"));
 		process.exit(2);
 		return;

@@ -1,11 +1,11 @@
 // @spec FR-001: Storage read/write, FR-004: Atomic writes, FR-007: Auto-create, FR-009: Corruption, FR-010: Version — .specs/features/001-task-manifest/spec.md#fr-001
 
-import { dirname } from "node:path";
 import { mkdir, rename, unlink } from "node:fs/promises";
+import { dirname } from "node:path";
 import { getTasksPath } from "../app/config";
+import { ManifestAccessError, ManifestCorruptedError, ManifestVersionError } from "./task.errors";
 import type { TaskManifest } from "./task.types";
 import { MANIFEST_VERSION } from "./task.types";
-import { ManifestCorruptedError, ManifestVersionError, ManifestAccessError } from "./task.errors";
 
 export class TaskRepository {
 	private readonly tasksPath: string;
@@ -44,12 +44,7 @@ export class TaskRepository {
 			throw new ManifestCorruptedError(this.tasksPath);
 		}
 
-		if (
-			typeof parsed !== "object" ||
-			parsed === null ||
-			!("version" in parsed) ||
-			!("tasks" in parsed)
-		) {
+		if (typeof parsed !== "object" || parsed === null || !("version" in parsed) || !("tasks" in parsed)) {
 			throw new ManifestCorruptedError(this.tasksPath);
 		}
 
@@ -88,7 +83,7 @@ export class TaskRepository {
 		const data = JSON.stringify(manifest, null, "\t");
 
 		try {
-			await Bun.write(tmpPath, data + "\n");
+			await Bun.write(tmpPath, `${data}\n`);
 			await rename(tmpPath, this.tasksPath);
 		} catch (err) {
 			// Clean up tmp file on failure

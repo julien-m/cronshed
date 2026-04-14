@@ -2,7 +2,7 @@
 
 import { validateCronExpression } from "../cron/cron.service";
 import { TASK_NAME_REGEX } from "../task/task.types";
-import type { ImportOptions, ImportResult, ImportedEntry, SkippedEntry } from "./import.types";
+import type { ImportedEntry, ImportOptions, ImportResult, SkippedEntry } from "./import.types";
 
 /** Pattern matching environment variable assignments in crontab. */
 // @spec FR-085: Skip env variable lines — .specs/features/011-import-existing-crontab/spec.md#fr-085
@@ -56,7 +56,11 @@ export function parseUserLine(line: string): { schedule: string; command: string
  */
 export function generateTaskName(command: string, prefix?: string): string {
 	// Extract first token before pipe, redirect, semicolon, or &&
-	const firstCmd = command.split(/[|><;&]/).at(0)?.trim() ?? command.trim();
+	const firstCmd =
+		command
+			.split(/[|><;&]/)
+			.at(0)
+			?.trim() ?? command.trim();
 
 	// Split by whitespace to get the executable (first arg)
 	const executable = firstCmd.split(/\s+/).at(0) ?? firstCmd;

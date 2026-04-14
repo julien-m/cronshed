@@ -1,16 +1,16 @@
 // @spec AC-042 through AC-049: Auto-sync integration tests — .specs/features/004-auto-sync/spec.md#ac-042
 
-import { test, expect, describe, beforeEach } from "bun:test";
-import { join } from "node:path";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { ShellExecutor } from "../crontab/crontab.adapter";
+import { CrontabAdapter } from "../crontab/crontab.adapter";
+import { CrontabWriteError } from "../crontab/crontab.errors";
+import type { CrontabEntry } from "../crontab/crontab.types";
+import { SyncService } from "../crontab/sync.service";
 import { TaskRepository } from "../task/task.repository";
 import { TaskService } from "../task/task.service";
-import { SyncService } from "../crontab/sync.service";
-import { CrontabAdapter } from "../crontab/crontab.adapter";
-import type { ShellExecutor } from "../crontab/crontab.adapter";
-import type { CrontabEntry } from "../crontab/crontab.types";
-import { CrontabWriteError } from "../crontab/crontab.errors";
 import { formatSyncConfirmation, formatWarning } from "./cli.formatter";
 
 /** In-memory crontab executor for testing. */
@@ -97,7 +97,11 @@ describe("Auto-sync on add", () => {
 		const adapter = createFailingAdapter();
 		const syncService = new SyncService(repo, adapter);
 
-		const task = await taskService.add({ name: "backup-db", schedule: "0 2 * * *", command: "/usr/local/bin/backup.sh" });
+		const task = await taskService.add({
+			name: "backup-db",
+			schedule: "0 2 * * *",
+			command: "/usr/local/bin/backup.sh",
+		});
 		expect(task.name).toBe("backup-db");
 
 		// Auto-sync would fail but the task is created
@@ -112,7 +116,7 @@ describe("Auto-sync on add", () => {
 		// Verify task still exists in manifest
 		const tasks = await taskService.list();
 		expect(tasks).toHaveLength(1);
-		expect(tasks[0]!.name).toBe("backup-db");
+		expect(tasks[0]?.name).toBe("backup-db");
 	});
 });
 
@@ -124,11 +128,7 @@ describe("Auto-sync on remove", () => {
 		await taskService.add({ name: "backup-db", schedule: "0 2 * * *", command: "/usr/local/bin/backup.sh" });
 
 		// First sync installs the task
-		const existingCrontab = [
-			"# cronshed:backup-db",
-			"0 2 * * * /usr/local/bin/backup.sh",
-			"",
-		].join("\n");
+		const existingCrontab = ["# cronshed:backup-db", "0 2 * * * /usr/local/bin/backup.sh", ""].join("\n");
 		const adapter = createTestAdapter(existingCrontab);
 		const syncService = new SyncService(repo, adapter);
 
@@ -146,11 +146,7 @@ describe("Auto-sync on remove", () => {
 
 		await taskService.add({ name: "backup-db", schedule: "0 2 * * *", command: "/usr/local/bin/backup.sh" });
 
-		const existingCrontab = [
-			"# cronshed:backup-db",
-			"0 2 * * * /usr/local/bin/backup.sh",
-			"",
-		].join("\n");
+		const existingCrontab = ["# cronshed:backup-db", "0 2 * * * /usr/local/bin/backup.sh", ""].join("\n");
 		const adapter = createTestAdapter(existingCrontab);
 
 		await taskService.remove("backup-db");
@@ -166,11 +162,7 @@ describe("Auto-sync on update", () => {
 
 		await taskService.add({ name: "backup-db", schedule: "0 2 * * *", command: "/usr/local/bin/backup.sh" });
 
-		const existingCrontab = [
-			"# cronshed:backup-db",
-			"0 2 * * * /usr/local/bin/backup.sh",
-			"",
-		].join("\n");
+		const existingCrontab = ["# cronshed:backup-db", "0 2 * * * /usr/local/bin/backup.sh", ""].join("\n");
 		const adapter = createTestAdapter(existingCrontab);
 		const syncService = new SyncService(repo, adapter);
 
@@ -193,7 +185,7 @@ describe("Auto-sync on update", () => {
 
 		// Even if sync would fail, the update is persisted
 		const tasks = await taskService.list();
-		expect(tasks[0]!.schedule).toBe("0 3 * * *");
+		expect(tasks[0]?.schedule).toBe("0 3 * * *");
 	});
 });
 
@@ -239,11 +231,7 @@ describe("Batch mutations with --no-sync", () => {
 
 		await taskService.add({ name: "old-task", schedule: "0 0 * * *", command: "echo old" });
 
-		const existingCrontab = [
-			"# cronshed:old-task",
-			"0 0 * * * echo old",
-			"",
-		].join("\n");
+		const existingCrontab = ["# cronshed:old-task", "0 0 * * * echo old", ""].join("\n");
 		const adapter = createTestAdapter(existingCrontab);
 		const syncService = new SyncService(repo, adapter);
 

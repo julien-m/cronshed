@@ -1,22 +1,22 @@
-import { test, expect, describe, beforeEach, afterEach } from "bun:test";
-import { mkdtemp, mkdir, writeFile, chmod } from "node:fs/promises";
-import { join } from "node:path";
+import { beforeEach, describe, expect, test } from "bun:test";
+import { chmod, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { DiagnosisService } from "./diagnosis.service";
-import { TaskRepository } from "../task/task.repository";
-import { CrontabAdapter } from "../crontab/crontab.adapter";
+import { join } from "node:path";
 import type { ShellExecutor } from "../crontab/crontab.adapter";
-import { WrapperService } from "../wrapper/wrapper.service";
-import type { Task } from "../task/task.types";
-import { DIAGNOSIS_CHECKS } from "./diagnosis.types";
+import { CrontabAdapter } from "../crontab/crontab.adapter";
+import { TaskRepository } from "../task/task.repository";
 import { TaskService } from "../task/task.service";
+import type { Task } from "../task/task.types";
+import { WrapperService } from "../wrapper/wrapper.service";
+import { DiagnosisService } from "./diagnosis.service";
+import { DIAGNOSIS_CHECKS } from "./diagnosis.types";
 
 let tmpDir: string;
 let repo: TaskRepository;
 let adapter: CrontabAdapter;
 let wrapperService: WrapperService;
 let service: DiagnosisService;
-let taskService: TaskService;
+let _taskService: TaskService;
 let mockCrontabContent: string;
 
 /** Mock executor that returns configurable crontab content. */
@@ -46,7 +46,7 @@ beforeEach(async () => {
 	adapter = new CrontabAdapter(createMockExecutor(() => mockCrontabContent));
 	wrapperService = new WrapperService(tmpDir);
 	service = new DiagnosisService(repo, adapter, wrapperService, tmpDir);
-	taskService = new TaskService(repo);
+	_taskService = new TaskService(repo);
 });
 
 /**
@@ -85,8 +85,8 @@ describe("DiagnosisService.diagnoseAll", () => {
 
 		const results = await service.diagnoseAll();
 		expect(results).toHaveLength(2);
-		expect(results[0]!.taskName).toBe("task-a");
-		expect(results[1]!.taskName).toBe("task-b");
+		expect(results[0]?.taskName).toBe("task-a");
+		expect(results[1]?.taskName).toBe("task-b");
 	});
 
 	test("returns ok for healthy inline-command tasks with wrappers and crontab", async () => {
@@ -99,8 +99,8 @@ describe("DiagnosisService.diagnoseAll", () => {
 
 		const results = await service.diagnoseAll();
 		expect(results).toHaveLength(1);
-		expect(results[0]!.status).toBe("ok");
-		expect(results[0]!.issues).toHaveLength(0);
+		expect(results[0]?.status).toBe("ok");
+		expect(results[0]?.issues).toHaveLength(0);
 	});
 });
 
@@ -113,9 +113,9 @@ describe("checkCronExpression", () => {
 
 		const issue = result.issues.find((i) => i.check === DIAGNOSIS_CHECKS.CRON_EXPRESSION);
 		expect(issue).toBeDefined();
-		expect(issue!.severity).toBe("error");
-		expect(issue!.message).toContain("Invalid cron expression");
-		expect(issue!.message).toContain("not a cron");
+		expect(issue?.severity).toBe("error");
+		expect(issue?.message).toContain("Invalid cron expression");
+		expect(issue?.message).toContain("not a cron");
 	});
 
 	test("valid cron expression passes", async () => {
@@ -132,7 +132,7 @@ describe("checkCronExpression", () => {
 
 		const issue = result.issues.find((i) => i.check === DIAGNOSIS_CHECKS.CRON_EXPRESSION);
 		expect(issue).toBeDefined();
-		expect(issue!.severity).toBe("error");
+		expect(issue?.severity).toBe("error");
 	});
 });
 
@@ -143,10 +143,11 @@ describe("checkCommandFile", () => {
 		const task = await createTask({ name: "inline-cmd", command: "echo hello" });
 		const result = await service.diagnose(task);
 
-		const fileIssues = result.issues.filter((i) =>
-			i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_NOT_FOUND ||
-			i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_NOT_EXECUTABLE ||
-			i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_IS_DIRECTORY
+		const fileIssues = result.issues.filter(
+			(i) =>
+				i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_NOT_FOUND ||
+				i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_NOT_EXECUTABLE ||
+				i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_IS_DIRECTORY,
 		);
 		expect(fileIssues).toHaveLength(0);
 	});
@@ -158,8 +159,8 @@ describe("checkCommandFile", () => {
 
 		const issue = result.issues.find((i) => i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_NOT_FOUND);
 		expect(issue).toBeDefined();
-		expect(issue!.severity).toBe("error");
-		expect(issue!.message).toContain("Command file not found");
+		expect(issue?.severity).toBe("error");
+		expect(issue?.message).toContain("Command file not found");
 	});
 
 	test("AC-006: detects non-executable command file", async () => {
@@ -172,9 +173,9 @@ describe("checkCommandFile", () => {
 
 		const issue = result.issues.find((i) => i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_NOT_EXECUTABLE);
 		expect(issue).toBeDefined();
-		expect(issue!.severity).toBe("error");
-		expect(issue!.message).toContain("not executable");
-		expect(issue!.hint).toContain("chmod +x");
+		expect(issue?.severity).toBe("error");
+		expect(issue?.message).toContain("not executable");
+		expect(issue?.hint).toContain("chmod +x");
 	});
 
 	test("AC-007: detects command path that is a directory", async () => {
@@ -186,8 +187,8 @@ describe("checkCommandFile", () => {
 
 		const issue = result.issues.find((i) => i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_IS_DIRECTORY);
 		expect(issue).toBeDefined();
-		expect(issue!.severity).toBe("error");
-		expect(issue!.message).toContain("is a directory");
+		expect(issue?.severity).toBe("error");
+		expect(issue?.message).toContain("is a directory");
 	});
 
 	test("valid executable file passes", async () => {
@@ -198,10 +199,11 @@ describe("checkCommandFile", () => {
 		const task = await createTask({ name: "good-file", command: scriptPath });
 		const result = await service.diagnose(task);
 
-		const fileIssues = result.issues.filter((i) =>
-			i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_NOT_FOUND ||
-			i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_NOT_EXECUTABLE ||
-			i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_IS_DIRECTORY
+		const fileIssues = result.issues.filter(
+			(i) =>
+				i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_NOT_FOUND ||
+				i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_NOT_EXECUTABLE ||
+				i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_IS_DIRECTORY,
 		);
 		expect(fileIssues).toHaveLength(0);
 	});
@@ -214,10 +216,11 @@ describe("checkCommandFile", () => {
 		const task = await createTask({ name: "with-args", command: `${scriptPath} --flag value` });
 		const result = await service.diagnose(task);
 
-		const fileIssues = result.issues.filter((i) =>
-			i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_NOT_FOUND ||
-			i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_NOT_EXECUTABLE ||
-			i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_IS_DIRECTORY
+		const fileIssues = result.issues.filter(
+			(i) =>
+				i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_NOT_FOUND ||
+				i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_NOT_EXECUTABLE ||
+				i.check === DIAGNOSIS_CHECKS.COMMAND_FILE_IS_DIRECTORY,
 		);
 		expect(fileIssues).toHaveLength(0);
 	});
@@ -234,8 +237,8 @@ describe("checkWrapper", () => {
 
 		const issue = result.issues.find((i) => i.check === DIAGNOSIS_CHECKS.WRAPPER_MISSING);
 		expect(issue).toBeDefined();
-		expect(issue!.severity).toBe("warning");
-		expect(issue!.hint).toContain("cronshed sync");
+		expect(issue?.severity).toBe("warning");
+		expect(issue?.hint).toContain("cronshed sync");
 	});
 
 	test("AC-010: detects stale wrapper script", async () => {
@@ -253,8 +256,8 @@ describe("checkWrapper", () => {
 
 		const issue = result.issues.find((i) => i.check === DIAGNOSIS_CHECKS.WRAPPER_STALE);
 		expect(issue).toBeDefined();
-		expect(issue!.severity).toBe("warning");
-		expect(issue!.hint).toContain("cronshed sync");
+		expect(issue?.severity).toBe("warning");
+		expect(issue?.hint).toContain("cronshed sync");
 	});
 
 	test("up-to-date wrapper passes", async () => {
@@ -263,9 +266,8 @@ describe("checkWrapper", () => {
 
 		const result = await service.diagnose(task);
 
-		const wrapperIssues = result.issues.filter((i) =>
-			i.check === DIAGNOSIS_CHECKS.WRAPPER_MISSING ||
-			i.check === DIAGNOSIS_CHECKS.WRAPPER_STALE
+		const wrapperIssues = result.issues.filter(
+			(i) => i.check === DIAGNOSIS_CHECKS.WRAPPER_MISSING || i.check === DIAGNOSIS_CHECKS.WRAPPER_STALE,
 		);
 		expect(wrapperIssues).toHaveLength(0);
 	});
@@ -283,8 +285,8 @@ describe("checkCrontabEntry", () => {
 
 		const issue = result.issues.find((i) => i.check === DIAGNOSIS_CHECKS.CRONTAB_ENTRY_MISSING);
 		expect(issue).toBeDefined();
-		expect(issue!.severity).toBe("warning");
-		expect(issue!.hint).toContain("cronshed sync");
+		expect(issue?.severity).toBe("warning");
+		expect(issue?.hint).toContain("cronshed sync");
 	});
 
 	test("AC-012: does not report missing crontab entry for paused task", async () => {

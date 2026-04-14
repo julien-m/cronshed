@@ -5,35 +5,31 @@
 //   - handlers/task-query.handler.ts — list, get, history, tags
 //   - handlers/ops.handler.ts       — sync, doctor, import, rotate, run
 
-import { TaskService } from "../task/task.service";
-import { TaskRepository } from "../task/task.repository";
-import { CrontabReadError, CrontabWriteError } from "../crontab/crontab.errors";
+import { InvalidConfigKeyError, InvalidConfigValueError } from "../config/config.service";
 import { InvalidCronExpressionError } from "../cron/cron.errors";
+import { CrontabReadError, CrontabWriteError } from "../crontab/crontab.errors";
 import {
-	TaskNotFoundError,
 	DuplicateTaskNameError,
-	InvalidTaskNameError,
 	EmptyCommandError,
-	NoChangesSpecifiedError,
+	InvalidTagError,
+	InvalidTaskNameError,
+	ManifestAccessError,
 	ManifestCorruptedError,
 	ManifestVersionError,
-	ManifestAccessError,
-	TaskAlreadyPausedError,
+	NoChangesSpecifiedError,
 	TaskAlreadyActiveError,
-	InvalidTagError,
+	TaskAlreadyPausedError,
+	TaskNotFoundError,
 } from "../task/task.errors";
-import {
-	CommandFileNotFoundError,
-	CommandFileNotExecutableError,
-	CommandPathIsDirectoryError,
-} from "./command.errors";
-import { WrapperGenerationError, TimeoutToolMissingError } from "../wrapper/wrapper.errors";
-import { InvalidConfigKeyError, InvalidConfigValueError } from "../config/config.service";
+import { TaskRepository } from "../task/task.repository";
+import { TaskService } from "../task/task.service";
+import { TimeoutToolMissingError, WrapperGenerationError } from "../wrapper/wrapper.errors";
+import { CommandFileNotExecutableError, CommandFileNotFoundError, CommandPathIsDirectoryError } from "./command.errors";
 import { formatError } from "./formatters/base.formatter";
-import { handleAdd, handleUpdate, handleRemove, handlePause, handleResume } from "./handlers/task-crud.handler";
-import { handleList, handleGet, handleHistory, handleTags } from "./handlers/task-query.handler";
-import { handleSync, handleDoctor, handleImport, handleRotate, handleRun } from "./handlers/ops.handler";
 import { handleConfig } from "./handlers/config.handler";
+import { handleDoctor, handleImport, handleRotate, handleRun, handleSync } from "./handlers/ops.handler";
+import { handleAdd, handlePause, handleRemove, handleResume, handleUpdate } from "./handlers/task-crud.handler";
+import { handleGet, handleHistory, handleList, handleTags } from "./handlers/task-query.handler";
 
 // @spec FR-008: Map domain errors to exit codes — .specs/features/001-task-manifest/spec.md#fr-008
 function getExitCode(err: unknown): number {
@@ -117,7 +113,10 @@ const QUERY_SUBCOMMANDS: Record<string, (args: string[], service: TaskService) =
 	tags: handleTags,
 };
 
-const MUTATION_SUBCOMMANDS: Record<string, (args: string[], service: TaskService, repo: TaskRepository) => Promise<void>> = {
+const MUTATION_SUBCOMMANDS: Record<
+	string,
+	(args: string[], service: TaskService, repo: TaskRepository) => Promise<void>
+> = {
 	add: handleAdd,
 	update: handleUpdate,
 	remove: handleRemove,
@@ -153,26 +152,58 @@ export async function runCli(argv: string[]): Promise<void> {
 		// @spec FR-015: Help text with tag flags — .specs/features/013-task-groups-tags/spec.md#fr-015
 		// @spec FR-088: Help text for protection flags — .specs/features/015-wrapper-protections/spec.md#fr-088
 		console.log("  add <name> --schedule '<cron>' --command '<cmd>' [--notify] [--tag <tag>]...");
-		console.log("      [--allow-parallel] [--timeout <duration>] [--no-sync]                                    Add a task");
-		console.log("  list [--tag <tag>] [--json]                                                                  List all tasks");
-		console.log("  get <name> [--json]                                                                          Show task details");
+		console.log(
+			"      [--allow-parallel] [--timeout <duration>] [--no-sync]                                    Add a task",
+		);
+		console.log(
+			"  list [--tag <tag>] [--json]                                                                  List all tasks",
+		);
+		console.log(
+			"  get <name> [--json]                                                                          Show task details",
+		);
 		console.log("  update <name> [--schedule] [--command] [--notify|--no-notify] [--tag]... [--untag]...");
-		console.log("      [--allow-parallel|--no-allow-parallel] [--timeout <duration>] [--no-sync]                Update a task");
-		console.log("  remove <name> [--no-sync]                                                                    Remove a task");
+		console.log(
+			"      [--allow-parallel|--no-allow-parallel] [--timeout <duration>] [--no-sync]                Update a task",
+		);
+		console.log(
+			"  remove <name> [--no-sync]                                                                    Remove a task",
+		);
 		// @spec FR-062: Help text for pause/resume — .specs/features/009-task-pause-resume/spec.md#fr-062
-		console.log("  pause <name> [--no-sync]                                                                     Pause a task");
-		console.log("  resume <name> [--no-sync]                                                                    Resume a paused task");
-		console.log("  history <name> [--limit N] [--json]                                                          Show execution history");
-		console.log("  tags [--json]                                                                                 List all tags");
-		console.log("  sync [--dry-run] [--clear]                                                                    Sync tasks to crontab");
+		console.log(
+			"  pause <name> [--no-sync]                                                                     Pause a task",
+		);
+		console.log(
+			"  resume <name> [--no-sync]                                                                    Resume a paused task",
+		);
+		console.log(
+			"  history <name> [--limit N] [--json]                                                          Show execution history",
+		);
+		console.log(
+			"  tags [--json]                                                                                 List all tags",
+		);
+		console.log(
+			"  sync [--dry-run] [--clear]                                                                    Sync tasks to crontab",
+		);
 		// @spec FR-073: Help text for doctor — .specs/features/010-task-diagnosis/spec.md#fr-073
-		console.log("  doctor [name] [--json]                                                                        Diagnose task issues");
-		console.log("  import [--dry-run] [--prefix <name>]                                                          Import crontab entries");
-		console.log("  rotate [name] [--max-age <days>] [--max-entries <N>] [--dry-run] [--json]                     Rotate execution logs");
-		console.log("  run <name> [--json]                                                                           Run a task immediately");
+		console.log(
+			"  doctor [name] [--json]                                                                        Diagnose task issues",
+		);
+		console.log(
+			"  import [--dry-run] [--prefix <name>]                                                          Import crontab entries",
+		);
+		console.log(
+			"  rotate [name] [--max-age <days>] [--max-entries <N>] [--dry-run] [--json]                     Rotate execution logs",
+		);
+		console.log(
+			"  run <name> [--json]                                                                           Run a task immediately",
+		);
 		// @spec FR-093: Help text for config command — .specs/features/015-wrapper-protections/spec.md#fr-093
-		console.log("  config set <key> <value>                                                                      Set a config value");
-		console.log("  config get <key>                                                                              Get a config value");
+		console.log(
+			"  config set <key> <value>                                                                      Set a config value",
+		);
+		console.log(
+			"  config get <key>                                                                              Get a config value",
+		);
 		return;
 	}
 
@@ -206,7 +237,7 @@ export async function runCli(argv: string[]): Promise<void> {
 		if (mutationHandler) {
 			await mutationHandler(args, service, repo);
 		} else {
-			await queryHandler!(args, service);
+			await queryHandler?.(args, service);
 		}
 	} catch (err) {
 		const code = getExitCode(err);

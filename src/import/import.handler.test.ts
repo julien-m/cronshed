@@ -1,12 +1,12 @@
-import { test, expect, describe, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { formatImportPreview, formatImportSummary, formatSkippedWarning } from "../cli/cli.formatter";
+import { CrontabAdapter, type ShellExecutor } from "../crontab/crontab.adapter";
 import { TaskRepository } from "../task/task.repository";
 import { TaskService } from "../task/task.service";
-import { CrontabAdapter, type ShellExecutor } from "../crontab/crontab.adapter";
 import { importCrontabEntries } from "./import.service";
-import { formatImportPreview, formatImportSummary, formatSkippedWarning } from "../cli/cli.formatter";
 
 // --- Test helpers ---
 
@@ -66,8 +66,8 @@ describe("import handler integration", () => {
 
 		// Should import 2 entries (skips comment and cronshed-managed)
 		expect(result.imported).toHaveLength(2);
-		expect(result.imported[0]!.name).toBe("hourly-check");
-		expect(result.imported[1]!.name).toBe("nightly-backup");
+		expect(result.imported[0]?.name).toBe("hourly-check");
+		expect(result.imported[1]?.name).toBe("nightly-backup");
 
 		// Create tasks
 		for (const entry of result.imported) {
@@ -81,12 +81,12 @@ describe("import handler integration", () => {
 		// Verify tasks in manifest
 		const tasks = await taskService.list();
 		expect(tasks).toHaveLength(2);
-		expect(tasks[0]!.name).toBe("hourly-check");
-		expect(tasks[0]!.schedule).toBe("0 * * * *");
-		expect(tasks[0]!.command).toBe("/usr/local/bin/hourly-check.sh");
-		expect(tasks[0]!.status).toBe("active");
-		expect(tasks[0]!.notify).toBe(false);
-		expect(tasks[1]!.name).toBe("nightly-backup");
+		expect(tasks[0]?.name).toBe("hourly-check");
+		expect(tasks[0]?.schedule).toBe("0 * * * *");
+		expect(tasks[0]?.command).toBe("/usr/local/bin/hourly-check.sh");
+		expect(tasks[0]?.status).toBe("active");
+		expect(tasks[0]?.notify).toBe(false);
+		expect(tasks[1]?.name).toBe("nightly-backup");
 	});
 
 	test("AC-003: imported tasks have active status and notify false", async () => {
@@ -108,8 +108,8 @@ describe("import handler integration", () => {
 		}
 
 		const tasks = await taskService.list();
-		expect(tasks[0]!.status).toBe("active");
-		expect(tasks[0]!.notify).toBe(false);
+		expect(tasks[0]?.status).toBe("active");
+		expect(tasks[0]?.notify).toBe(false);
 	});
 
 	test("AC-005: cronshed-managed entries are not imported", async () => {
@@ -126,7 +126,7 @@ describe("import handler integration", () => {
 		// userLines should NOT contain the cronshed marker/cron line
 		const result = importCrontabEntries(parsed.userLines, new Set(), { dryRun: false });
 		expect(result.imported).toHaveLength(1);
-		expect(result.imported[0]!.name).toBe("user-task");
+		expect(result.imported[0]?.name).toBe("user-task");
 	});
 
 	test("AC-008: resolves name conflicts with existing tasks", async () => {
@@ -144,14 +144,11 @@ describe("import handler integration", () => {
 		const existingNames = new Set(existingTasks.map((t) => t.name));
 
 		const result = importCrontabEntries(parsed.userLines, existingNames, { dryRun: false });
-		expect(result.imported[0]!.name).toBe("backup-2");
+		expect(result.imported[0]?.name).toBe("backup-2");
 	});
 
 	test("AC-010, AC-011: dry-run shows preview without creating tasks", async () => {
-		const crontab = [
-			"0 * * * * /usr/bin/task-a.sh",
-			"30 * * * * /usr/bin/task-b.sh",
-		].join("\n");
+		const crontab = ["0 * * * * /usr/bin/task-a.sh", "30 * * * * /usr/bin/task-b.sh"].join("\n");
 
 		const executor = createMockExecutor(crontab);
 		const adapter = new CrontabAdapter(executor);
@@ -195,10 +192,7 @@ describe("import handler integration", () => {
 	});
 
 	test("AC-007: prefix applied to all imported task names", async () => {
-		const crontab = [
-			"0 * * * * /usr/bin/backup.sh",
-			"30 * * * * curl https://example.com/ping",
-		].join("\n");
+		const crontab = ["0 * * * * /usr/bin/backup.sh", "30 * * * * curl https://example.com/ping"].join("\n");
 
 		const executor = createMockExecutor(crontab);
 		const adapter = new CrontabAdapter(executor);
@@ -211,8 +205,8 @@ describe("import handler integration", () => {
 			prefix: "old",
 		});
 
-		expect(result.imported[0]!.name).toBe("old-backup");
-		expect(result.imported[1]!.name).toBe("old-curl");
+		expect(result.imported[0]?.name).toBe("old-backup");
+		expect(result.imported[1]?.name).toBe("old-curl");
 
 		// Verify they can be added
 		for (const entry of result.imported) {
@@ -224,7 +218,7 @@ describe("import handler integration", () => {
 		}
 		const tasks = await taskService.list();
 		expect(tasks).toHaveLength(2);
-		expect(tasks[0]!.name).toBe("old-backup");
+		expect(tasks[0]?.name).toBe("old-backup");
 	});
 
 	test("AC-013: summary shows count of imported tasks", () => {
@@ -244,9 +238,7 @@ describe("import handler integration", () => {
 
 	test("AC-013: summary uses singular for 1 task", () => {
 		const result = {
-			imported: [
-				{ name: "a", schedule: "0 * * * *", command: "/a", originalLine: "0 * * * * /a" },
-			],
+			imported: [{ name: "a", schedule: "0 * * * *", command: "/a", originalLine: "0 * * * * /a" }],
 			skipped: [],
 			dryRun: false,
 		};
@@ -278,8 +270,8 @@ describe("import handler integration", () => {
 
 		const result = importCrontabEntries(parsed.userLines, new Set(), { dryRun: false });
 		expect(result.imported).toHaveLength(2);
-		expect(result.imported[0]!.name).toBe("backup");
-		expect(result.imported[1]!.name).toBe("check-status");
+		expect(result.imported[0]?.name).toBe("backup");
+		expect(result.imported[1]?.name).toBe("check-status");
 		// Env vars are in skipped
 		expect(result.skipped.filter((s) => s.reason === "Environment variable")).toHaveLength(2);
 	});

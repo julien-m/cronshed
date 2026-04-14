@@ -1,7 +1,17 @@
-import { test, expect, describe } from "bun:test";
-import { formatTaskTable, formatTaskDetails, formatHistoryTable, formatDuration, formatSuccess, formatError, formatWarning, formatSyncConfirmation, formatRotationSummary } from "./cli.formatter";
-import type { Task, EnrichedTask } from "../task/task.types";
+import { describe, expect, test } from "bun:test";
 import type { ExecutionLogEntry } from "../log/log.types";
+import type { EnrichedTask, Task } from "../task/task.types";
+import {
+	formatDuration,
+	formatError,
+	formatHistoryTable,
+	formatRotationSummary,
+	formatSuccess,
+	formatSyncConfirmation,
+	formatTaskDetails,
+	formatTaskTable,
+	formatWarning,
+} from "./cli.formatter";
 
 const sampleTask: Task = {
 	id: "test-uuid-123",
@@ -46,7 +56,7 @@ describe("formatTaskTable", () => {
 	test("AC-012: COMMAND column is not shown in list output", () => {
 		const output = formatTaskTable([sampleEnrichedTask]);
 		// COMMAND should not be a header
-		const headerLine = output.split("\n")[0]!;
+		const [headerLine = ""] = output.split("\n");
 		expect(headerLine).not.toContain("COMMAND");
 	});
 
@@ -270,7 +280,7 @@ describe("formatHistoryTable", () => {
 			stdout: "a".repeat(100),
 		};
 		const output = formatHistoryTable([longEntry]);
-		expect(output).toContain("a".repeat(80) + "...");
+		expect(output).toContain(`${"a".repeat(80)}...`);
 		expect(output).not.toContain("a".repeat(100));
 	});
 
@@ -280,7 +290,7 @@ describe("formatHistoryTable", () => {
 			stderr: "e".repeat(100),
 		};
 		const output = formatHistoryTable([longEntry]);
-		expect(output).toContain("e".repeat(80) + "...");
+		expect(output).toContain(`${"e".repeat(80)}...`);
 	});
 
 	test("FR-005: replaces newlines in stdout/stderr with spaces", () => {
@@ -318,26 +328,20 @@ describe("formatRotationSummary", () => {
 	});
 
 	test("AC-008: shows nothing to rotate when no entries removed", () => {
-		const results = [
-			{ taskName: "backup-db", entriesBefore: 10, entriesAfter: 10, entriesRemoved: 0 },
-		];
+		const results = [{ taskName: "backup-db", entriesBefore: 10, entriesAfter: 10, entriesRemoved: 0 }];
 		const output = formatRotationSummary(results, false);
 		expect(output).toBe("Nothing to rotate");
 	});
 
 	test("shows dry-run prefix", () => {
-		const results = [
-			{ taskName: "backup-db", entriesBefore: 100, entriesAfter: 50, entriesRemoved: 50 },
-		];
+		const results = [{ taskName: "backup-db", entriesBefore: 100, entriesAfter: 50, entriesRemoved: 50 }];
 		const output = formatRotationSummary(results, true);
 		expect(output).toContain("Would remove 50 entries");
 		expect(output).toContain("Would remove 50 entries across 1 task");
 	});
 
 	test("handles single task with singular entry word", () => {
-		const results = [
-			{ taskName: "backup-db", entriesBefore: 2, entriesAfter: 1, entriesRemoved: 1 },
-		];
+		const results = [{ taskName: "backup-db", entriesBefore: 2, entriesAfter: 1, entriesRemoved: 1 }];
 		const output = formatRotationSummary(results, false);
 		expect(output).toContain("Removed 1 entry");
 		expect(output).toContain("1 entry across 1 task");

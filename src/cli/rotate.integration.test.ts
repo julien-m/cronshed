@@ -1,7 +1,7 @@
-import { test, expect, describe, beforeEach } from "bun:test";
-import { join } from "node:path";
-import { mkdtemp, mkdir } from "node:fs/promises";
+import { beforeEach, describe, expect, test } from "bun:test";
+import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const CLI = join(import.meta.dir, "../../index.ts");
 
@@ -20,10 +20,7 @@ async function run(...args: string[]) {
 		stderr: "pipe",
 	});
 
-	const [stdout, stderr] = await Promise.all([
-		new Response(proc.stdout).text(),
-		new Response(proc.stderr).text(),
-	]);
+	const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
 	const exitCode = await proc.exited;
 
 	return { stdout: stdout.trim(), stderr: stderr.trim(), exitCode };
@@ -54,7 +51,7 @@ async function setupTaskWithLogs(taskName: string, entries: string[]) {
 	const logsDir = join(tmpDir, "logs");
 	await mkdir(logsDir, { recursive: true });
 	const logPath = join(logsDir, `${taskName}.jsonl`);
-	await Bun.write(logPath, entries.join("\n") + "\n");
+	await Bun.write(logPath, `${entries.join("\n")}\n`);
 }
 
 describe("cronshed rotate", () => {
@@ -114,10 +111,7 @@ describe("cronshed rotate", () => {
 	});
 
 	test("AC-006: --dry-run shows preview without modifying files", async () => {
-		const entries = [
-			buildEntry(daysAgo(60).toISOString()),
-			buildEntry(daysAgo(5).toISOString()),
-		];
+		const entries = [buildEntry(daysAgo(60).toISOString()), buildEntry(daysAgo(5).toISOString())];
 		await setupTaskWithLogs("backup-db", entries);
 
 		const { stdout, exitCode } = await run("rotate", "--dry-run");
@@ -132,10 +126,7 @@ describe("cronshed rotate", () => {
 	});
 
 	test("AC-008: shows nothing to rotate when no entries exceed thresholds", async () => {
-		const entries = [
-			buildEntry(daysAgo(5).toISOString()),
-			buildEntry(daysAgo(2).toISOString()),
-		];
+		const entries = [buildEntry(daysAgo(5).toISOString()), buildEntry(daysAgo(2).toISOString())];
 		await setupTaskWithLogs("backup-db", entries);
 
 		const { stdout, exitCode } = await run("rotate");
@@ -144,10 +135,7 @@ describe("cronshed rotate", () => {
 	});
 
 	test("AC-009: rotate <name> targets a single task only", async () => {
-		const oldEntries = [
-			buildEntry(daysAgo(60).toISOString()),
-			buildEntry(daysAgo(5).toISOString()),
-		];
+		const oldEntries = [buildEntry(daysAgo(60).toISOString()), buildEntry(daysAgo(5).toISOString())];
 		await setupTaskWithLogs("task-a", oldEntries);
 		await setupTaskWithLogs("task-b", oldEntries);
 
@@ -172,10 +160,7 @@ describe("cronshed rotate", () => {
 	});
 
 	test("AC-011: --json outputs structured JSON", async () => {
-		const entries = [
-			buildEntry(daysAgo(60).toISOString()),
-			buildEntry(daysAgo(5).toISOString()),
-		];
+		const entries = [buildEntry(daysAgo(60).toISOString()), buildEntry(daysAgo(5).toISOString())];
 		await setupTaskWithLogs("backup-db", entries);
 
 		const { stdout, exitCode } = await run("rotate", "--json");
@@ -213,13 +198,8 @@ describe("cronshed rotate", () => {
 	});
 
 	test("handles multiple tasks with mixed rotation needs", async () => {
-		const oldEntries = [
-			buildEntry(daysAgo(60).toISOString()),
-			buildEntry(daysAgo(5).toISOString()),
-		];
-		const freshEntries = [
-			buildEntry(daysAgo(5).toISOString()),
-		];
+		const oldEntries = [buildEntry(daysAgo(60).toISOString()), buildEntry(daysAgo(5).toISOString())];
+		const freshEntries = [buildEntry(daysAgo(5).toISOString())];
 		await setupTaskWithLogs("old-task", oldEntries);
 		await setupTaskWithLogs("fresh-task", freshEntries);
 

@@ -2,17 +2,17 @@
 // @spec FR-004: Enriched table columns — .specs/features/006-task-listing-status/spec.md#fr-004
 // @spec FR-005: Enriched details — .specs/features/006-task-listing-status/spec.md#fr-005
 
-import type { EnrichedTask } from "../../task/task.types";
 import type { ExecutionLogEntry } from "../../log/log.types";
+import type { EnrichedTask } from "../../task/task.types";
 import {
 	ANSI_GREEN,
 	ANSI_RED,
 	ANSI_RESET,
+	formatDuration,
+	formatExitCode,
 	formatTimestamp,
 	formatTimestampWithSeconds,
 	truncateOutput,
-	formatExitCode,
-	formatDuration,
 } from "./base.formatter";
 
 /** Maximum characters per stdout/stderr field in history table display. */
@@ -40,15 +40,12 @@ export function formatTaskTable(tasks: EnrichedTask[]): string {
 		t.tags.length > 0 ? t.tags.join(", ") : "\u2014",
 	]);
 
-	const colWidths = headers.map((h, i) =>
-		Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length))
-	);
+	const colWidths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)));
 
 	const pad = (str: string, width: number) => str.padEnd(width);
-	const headerLine = headers.map((h, i) => pad(h, colWidths[i]!)).join("  ");
-	const dataLines = rows.map((row) =>
-		row.map((cell, i) => pad(cell ?? "", colWidths[i]!)).join("  ")
-	);
+	const getColWidth = (index: number) => colWidths[index] ?? 0;
+	const headerLine = headers.map((h, i) => pad(h, getColWidth(i))).join("  ");
+	const dataLines = rows.map((row) => row.map((cell, i) => pad(cell ?? "", getColWidth(i))).join("  "));
 
 	return [headerLine, ...dataLines].join("\n");
 }
@@ -82,9 +79,10 @@ export function formatTaskDetails(task: EnrichedTask): string {
 	if (task.lastRun) {
 		lines.push(`Last run:   ${formatTimestamp(task.lastRun)}`);
 		if (task.lastExitCode !== null) {
-			const exitCodeStr = task.lastExitCode === 0
-				? `${ANSI_GREEN()}${task.lastExitCode}${ANSI_RESET()}`
-				: `${ANSI_RED()}${task.lastExitCode}${ANSI_RESET()}`;
+			const exitCodeStr =
+				task.lastExitCode === 0
+					? `${ANSI_GREEN()}${task.lastExitCode}${ANSI_RESET()}`
+					: `${ANSI_RED()}${task.lastExitCode}${ANSI_RESET()}`;
 			lines.push(`Exit code:  ${exitCodeStr}`);
 		}
 	} else {
@@ -129,9 +127,7 @@ export function formatHistoryTable(entries: ExecutionLogEntry[]): string {
 		];
 	});
 
-	const colWidths = headers.map((h, i) =>
-		Math.max(h.length, ...rawRows.map((r) => (r[i] ?? "").length))
-	);
+	const colWidths = headers.map((h, i) => Math.max(h.length, ...rawRows.map((r) => (r[i] ?? "").length)));
 
 	const pad = (str: string, width: number, rawStr?: string) => {
 		const rawLen = rawStr !== undefined ? rawStr.length : str.length;
@@ -139,9 +135,10 @@ export function formatHistoryTable(entries: ExecutionLogEntry[]): string {
 		return str + " ".repeat(padding);
 	};
 
-	const headerLine = headers.map((h, i) => pad(h, colWidths[i]!)).join("  ");
+	const getColWidth = (index: number) => colWidths[index] ?? 0;
+	const headerLine = headers.map((h, i) => pad(h, getColWidth(i))).join("  ");
 	const dataLines = rows.map((row, rowIdx) =>
-		row.map((cell, colIdx) => pad(cell ?? "", colWidths[colIdx]!, rawRows[rowIdx]![colIdx])).join("  ")
+		row.map((cell, colIdx) => pad(cell ?? "", getColWidth(colIdx), rawRows[rowIdx]?.[colIdx])).join("  "),
 	);
 
 	return [headerLine, ...dataLines].join("\n");

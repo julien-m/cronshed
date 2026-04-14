@@ -6,18 +6,18 @@
 // @spec FR-012: Tags table formatting — .specs/features/013-task-groups-tags/spec.md#fr-012
 // @spec FR-080: Import preview formatting, FR-083: Import summary — .specs/features/011-import-existing-crontab/spec.md#fr-080
 
-import type { SyncResult, SyncDiffEntry } from "../../crontab/sync.service";
+import type { SyncDiffEntry, SyncResult } from "../../crontab/sync.service";
 import type { DiagnosisResult } from "../../diagnosis/diagnosis.types";
-import type { ImportResult, ImportedEntry, SkippedEntry } from "../../import/import.types";
+import type { ImportedEntry, ImportResult, SkippedEntry } from "../../import/import.types";
 import type { RotationResult } from "../../log/rotation.types";
 import {
 	ANSI_GREEN,
 	ANSI_RED,
-	ANSI_YELLOW,
 	ANSI_RESET,
+	ANSI_YELLOW,
+	formatDuration,
 	formatSuccess,
 	formatWarning,
-	formatDuration,
 } from "./base.formatter";
 
 /**
@@ -31,7 +31,9 @@ export function formatSyncResult(result: SyncResult, isClear: boolean): string {
 		if (result.isUpToDate) {
 			return formatSuccess("No cronshed entries to remove");
 		}
-		return formatSuccess(`Removed ${result.removed} cronshed ${result.removed === 1 ? "entry" : "entries"} from crontab`);
+		return formatSuccess(
+			`Removed ${result.removed} cronshed ${result.removed === 1 ? "entry" : "entries"} from crontab`,
+		);
 	}
 
 	if (result.isUpToDate) {
@@ -39,7 +41,7 @@ export function formatSyncResult(result: SyncResult, isClear: boolean): string {
 	}
 
 	return formatSuccess(
-		`Synced ${result.total} ${result.total === 1 ? "task" : "tasks"} to crontab (${result.installed} installed, ${result.updated} updated, ${result.removed} removed)`
+		`Synced ${result.total} ${result.total === 1 ? "task" : "tasks"} to crontab (${result.installed} installed, ${result.updated} updated, ${result.removed} removed)`,
 	);
 }
 
@@ -133,15 +135,12 @@ export function formatImportPreview(entries: ImportedEntry[]): string {
 	const headers = ["NAME", "SCHEDULE", "COMMAND"];
 	const rows = entries.map((e) => [e.name, e.schedule, e.command]);
 
-	const colWidths = headers.map((h, i) =>
-		Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length))
-	);
+	const colWidths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)));
 
 	const pad = (str: string, width: number) => str.padEnd(width);
-	const headerLine = headers.map((h, i) => pad(h, colWidths[i]!)).join("  ");
-	const dataLines = rows.map((row) =>
-		row.map((cell, i) => pad(cell ?? "", colWidths[i]!)).join("  ")
-	);
+	const getColWidth = (index: number) => colWidths[index] ?? 0;
+	const headerLine = headers.map((h, i) => pad(h, getColWidth(i))).join("  ");
+	const dataLines = rows.map((row) => row.map((cell, i) => pad(cell ?? "", getColWidth(i))).join("  "));
 
 	return [headerLine, ...dataLines].join("\n");
 }
@@ -193,7 +192,9 @@ export function formatRotationSummary(results: RotationResult[], dryRun: boolean
 
 	for (const result of withRemovals) {
 		const entryWord = result.entriesRemoved === 1 ? "entry" : "entries";
-		lines.push(`  ${result.taskName}: ${verb} ${result.entriesRemoved} ${entryWord} (${result.entriesBefore} \u2192 ${result.entriesAfter})`);
+		lines.push(
+			`  ${result.taskName}: ${verb} ${result.entriesRemoved} ${entryWord} (${result.entriesBefore} \u2192 ${result.entriesAfter})`,
+		);
 	}
 
 	const totalRemoved = withRemovals.reduce((sum, r) => sum + r.entriesRemoved, 0);
@@ -239,15 +240,12 @@ export function formatTagsTable(tagCounts: Map<string, number>): string {
 	const sorted = [...tagCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 	const rows = sorted.map(([tag, count]) => [tag, String(count)]);
 
-	const colWidths = headers.map((h, i) =>
-		Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length))
-	);
+	const colWidths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)));
 
 	const pad = (str: string, width: number) => str.padEnd(width);
-	const headerLine = headers.map((h, i) => pad(h, colWidths[i]!)).join("  ");
-	const dataLines = rows.map((row) =>
-		row.map((cell, i) => pad(cell ?? "", colWidths[i]!)).join("  ")
-	);
+	const getColWidth = (index: number) => colWidths[index] ?? 0;
+	const headerLine = headers.map((h, i) => pad(h, getColWidth(i))).join("  ");
+	const dataLines = rows.map((row) => row.map((cell, i) => pad(cell ?? "", getColWidth(i))).join("  "));
 
 	return [headerLine, ...dataLines].join("\n");
 }

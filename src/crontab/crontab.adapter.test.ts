@@ -1,7 +1,7 @@
-import { test, expect, describe } from "bun:test";
-import { CrontabAdapter } from "./crontab.adapter";
+import { describe, expect, test } from "bun:test";
 import type { ShellExecutor } from "./crontab.adapter";
-import { CrontabReadError, CrontabWriteError } from "./crontab.errors";
+import { CrontabAdapter } from "./crontab.adapter";
+import { CrontabReadError } from "./crontab.errors";
 import type { CrontabEntry } from "./crontab.types";
 
 function mockExecutor(responses: Record<string, { stdout: string; stderr: string; exitCode: number }>): ShellExecutor {
@@ -19,14 +19,14 @@ function mockExecutor(responses: Record<string, { stdout: string; stderr: string
 
 describe("CrontabAdapter.read", () => {
 	test("AC-030: parses crontab with cronshed entries and user lines", async () => {
-		const crontab = [
+		const crontab = `${[
 			"30 3 * * * /usr/bin/custom-job",
 			"",
 			"# cronshed:backup-db",
 			"0 2 * * * /usr/local/bin/backup.sh",
 			"# cronshed:cleanup-logs",
 			"0 4 * * 0 find /tmp -name '*.log' -delete",
-		].join("\n") + "\n";
+		].join("\n")}\n`;
 
 		const executor = mockExecutor({ "crontab -l": { stdout: crontab, stderr: "", exitCode: 0 } });
 		const adapter = new CrontabAdapter(executor);
@@ -34,10 +34,10 @@ describe("CrontabAdapter.read", () => {
 
 		expect(result.userLines).toEqual(["30 3 * * * /usr/bin/custom-job"]);
 		expect(result.entries).toHaveLength(2);
-		expect(result.entries[0]!.taskName).toBe("backup-db");
-		expect(result.entries[0]!.schedule).toBe("0 2 * * *");
-		expect(result.entries[0]!.command).toBe("/usr/local/bin/backup.sh");
-		expect(result.entries[1]!.taskName).toBe("cleanup-logs");
+		expect(result.entries[0]?.taskName).toBe("backup-db");
+		expect(result.entries[0]?.schedule).toBe("0 2 * * *");
+		expect(result.entries[0]?.command).toBe("/usr/local/bin/backup.sh");
+		expect(result.entries[1]?.taskName).toBe("cleanup-logs");
 	});
 
 	test("AC-039: treats 'no crontab for user' as empty crontab", async () => {
@@ -61,26 +61,24 @@ describe("CrontabAdapter.read", () => {
 	});
 
 	test("AC-031: discards orphaned marker without following cron line", async () => {
-		const crontab = [
+		const crontab = `${[
 			"# cronshed:broken-task",
 			"# this is a comment, not a cron line",
 			"# cronshed:valid-task",
 			"0 2 * * * /usr/local/bin/backup.sh",
-		].join("\n") + "\n";
+		].join("\n")}\n`;
 
 		const executor = mockExecutor({ "crontab -l": { stdout: crontab, stderr: "", exitCode: 0 } });
 		const adapter = new CrontabAdapter(executor);
 		const result = await adapter.read();
 
 		expect(result.entries).toHaveLength(1);
-		expect(result.entries[0]!.taskName).toBe("valid-task");
+		expect(result.entries[0]?.taskName).toBe("valid-task");
 		expect(result.userLines).toContain("# this is a comment, not a cron line");
 	});
 
 	test("AC-031: discards orphaned marker at EOF", async () => {
-		const crontab = [
-			"# cronshed:orphan-at-eof",
-		].join("\n") + "\n";
+		const crontab = `${["# cronshed:orphan-at-eof"].join("\n")}\n`;
 
 		const executor = mockExecutor({ "crontab -l": { stdout: crontab, stderr: "", exitCode: 0 } });
 		const adapter = new CrontabAdapter(executor);
@@ -124,11 +122,7 @@ describe("CrontabAdapter.build", () => {
 	});
 
 	test("AC-033: preserves user lines verbatim", () => {
-		const userLines = [
-			"# My custom comment",
-			"SHELL=/bin/bash",
-			"30 3 * * * /usr/bin/custom-job",
-		];
+		const userLines = ["# My custom comment", "SHELL=/bin/bash", "30 3 * * * /usr/bin/custom-job"];
 
 		const result = adapter.build(userLines, []);
 		const lines = result.trimEnd().split("\n");

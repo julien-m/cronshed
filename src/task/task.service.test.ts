@@ -1,19 +1,19 @@
-import { test, expect, describe, beforeEach, afterEach } from "bun:test";
-import { TaskService } from "./task.service";
-import { TaskRepository } from "./task.repository";
-import {
-	TaskNotFoundError,
-	DuplicateTaskNameError,
-	InvalidTaskNameError,
-	EmptyCommandError,
-	TaskAlreadyPausedError,
-	TaskAlreadyActiveError,
-	InvalidTagError,
-} from "./task.errors";
-import { InvalidCronExpressionError } from "../cron/cron.errors";
-import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { InvalidCronExpressionError } from "../cron/cron.errors";
+import {
+	DuplicateTaskNameError,
+	EmptyCommandError,
+	InvalidTagError,
+	InvalidTaskNameError,
+	TaskAlreadyActiveError,
+	TaskAlreadyPausedError,
+	TaskNotFoundError,
+} from "./task.errors";
+import { TaskRepository } from "./task.repository";
+import { TaskService } from "./task.service";
 
 let tmpDir: string;
 let service: TaskService;
@@ -46,22 +46,36 @@ describe("TaskService.add", () => {
 
 	test("AC-003: rejects duplicate task names", async () => {
 		await service.add({ name: "my-task", schedule: "0 0 * * *", command: "echo hi" });
-		await expect(service.add({ name: "my-task", schedule: "0 1 * * *", command: "echo dup" })).rejects.toThrow(DuplicateTaskNameError);
+		await expect(service.add({ name: "my-task", schedule: "0 1 * * *", command: "echo dup" })).rejects.toThrow(
+			DuplicateTaskNameError,
+		);
 	});
 
 	test("AC-002: rejects invalid cron expressions", async () => {
-		await expect(service.add({ name: "bad-cron", schedule: "bad", command: "echo hi" })).rejects.toThrow(InvalidCronExpressionError);
+		await expect(service.add({ name: "bad-cron", schedule: "bad", command: "echo hi" })).rejects.toThrow(
+			InvalidCronExpressionError,
+		);
 	});
 
 	test("rejects invalid task names", async () => {
-		await expect(service.add({ name: "BAD NAME", schedule: "0 0 * * *", command: "echo hi" })).rejects.toThrow(InvalidTaskNameError);
-		await expect(service.add({ name: "bad_name", schedule: "0 0 * * *", command: "echo hi" })).rejects.toThrow(InvalidTaskNameError);
-		await expect(service.add({ name: "-leading", schedule: "0 0 * * *", command: "echo hi" })).rejects.toThrow(InvalidTaskNameError);
+		await expect(service.add({ name: "BAD NAME", schedule: "0 0 * * *", command: "echo hi" })).rejects.toThrow(
+			InvalidTaskNameError,
+		);
+		await expect(service.add({ name: "bad_name", schedule: "0 0 * * *", command: "echo hi" })).rejects.toThrow(
+			InvalidTaskNameError,
+		);
+		await expect(service.add({ name: "-leading", schedule: "0 0 * * *", command: "echo hi" })).rejects.toThrow(
+			InvalidTaskNameError,
+		);
 	});
 
 	test("rejects empty command", async () => {
-		await expect(service.add({ name: "empty-cmd", schedule: "0 0 * * *", command: "" })).rejects.toThrow(EmptyCommandError);
-		await expect(service.add({ name: "space-cmd", schedule: "0 0 * * *", command: "   " })).rejects.toThrow(EmptyCommandError);
+		await expect(service.add({ name: "empty-cmd", schedule: "0 0 * * *", command: "" })).rejects.toThrow(
+			EmptyCommandError,
+		);
+		await expect(service.add({ name: "space-cmd", schedule: "0 0 * * *", command: "   " })).rejects.toThrow(
+			EmptyCommandError,
+		);
 	});
 
 	// @spec FR-047: Default notify to false — .specs/features/008-failure-notifications/spec.md#fr-047
@@ -294,25 +308,44 @@ describe("TaskService.add — tags", () => {
 	});
 
 	test("AC-002: creates task with provided tags", async () => {
-		const task = await service.add({ name: "tagged", schedule: "0 0 * * *", command: "echo hi", tags: ["backup", "db"] });
+		const task = await service.add({
+			name: "tagged",
+			schedule: "0 0 * * *",
+			command: "echo hi",
+			tags: ["backup", "db"],
+		});
 		expect(task.tags).toEqual(["backup", "db"]);
 	});
 
 	test("AC-003: rejects invalid tag format", async () => {
-		await expect(service.add({ name: "bad-tag", schedule: "0 0 * * *", command: "echo hi", tags: ["BAD TAG"] })).rejects.toThrow(InvalidTagError);
+		await expect(
+			service.add({ name: "bad-tag", schedule: "0 0 * * *", command: "echo hi", tags: ["BAD TAG"] }),
+		).rejects.toThrow(InvalidTagError);
 	});
 
 	test("AC-003: rejects empty string tag", async () => {
-		await expect(service.add({ name: "empty-tag", schedule: "0 0 * * *", command: "echo hi", tags: [""] })).rejects.toThrow(InvalidTagError);
+		await expect(
+			service.add({ name: "empty-tag", schedule: "0 0 * * *", command: "echo hi", tags: [""] }),
+		).rejects.toThrow(InvalidTagError);
 	});
 
 	test("AC-007: deduplicates tags", async () => {
-		const task = await service.add({ name: "dup-tags", schedule: "0 0 * * *", command: "echo hi", tags: ["backup", "backup", "db"] });
+		const task = await service.add({
+			name: "dup-tags",
+			schedule: "0 0 * * *",
+			command: "echo hi",
+			tags: ["backup", "backup", "db"],
+		});
 		expect(task.tags).toEqual(["backup", "db"]);
 	});
 
 	test("AC-007: sorts tags alphabetically", async () => {
-		const task = await service.add({ name: "sorted-tags", schedule: "0 0 * * *", command: "echo hi", tags: ["z-tag", "a-tag", "m-tag"] });
+		const task = await service.add({
+			name: "sorted-tags",
+			schedule: "0 0 * * *",
+			command: "echo hi",
+			tags: ["z-tag", "a-tag", "m-tag"],
+		});
 		expect(task.tags).toEqual(["a-tag", "m-tag", "z-tag"]);
 	});
 });
@@ -386,20 +419,22 @@ describe("TaskRepository backward compat — tags", () => {
 		const tasksPath = join(tmpDir, "tasks.json");
 		const manifest = {
 			version: 1,
-			tasks: [{
-				id: "test-id",
-				name: "legacy-task",
-				schedule: "0 0 * * *",
-				command: "echo legacy",
-				status: "active",
-				notify: false,
-				createdAt: "2026-01-01T00:00:00.000Z",
-			}],
+			tasks: [
+				{
+					id: "test-id",
+					name: "legacy-task",
+					schedule: "0 0 * * *",
+					command: "echo legacy",
+					status: "active",
+					notify: false,
+					createdAt: "2026-01-01T00:00:00.000Z",
+				},
+			],
 		};
 		await Bun.write(tasksPath, JSON.stringify(manifest));
 
 		const repo = new TaskRepository(tasksPath);
 		const loaded = await repo.load();
-		expect(loaded.tasks[0]!.tags).toEqual([]);
+		expect(loaded.tasks[0]?.tags).toEqual([]);
 	});
 });

@@ -1,8 +1,8 @@
-import { test, expect, describe, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { rotateLogFile, DEFAULT_MAX_AGE_DAYS, DEFAULT_MAX_ENTRIES } from "./rotation.service";
+import { join } from "node:path";
+import { DEFAULT_MAX_AGE_DAYS, DEFAULT_MAX_ENTRIES, rotateLogFile } from "./rotation.service";
 import type { RotationOptions } from "./rotation.types";
 
 let tempDir: string;
@@ -51,7 +51,7 @@ describe("rotateLogFile", () => {
 			buildEntry(daysAgo(10).toISOString()),
 			buildEntry(daysAgo(5).toISOString()),
 		];
-		await Bun.write(logPath, lines.join("\n") + "\n");
+		await Bun.write(logPath, `${lines.join("\n")}\n`);
 
 		const result = await rotateLogFile("task", logPath, defaultOptions());
 
@@ -72,7 +72,7 @@ describe("rotateLogFile", () => {
 		for (let i = 19; i >= 0; i--) {
 			lines.push(buildEntry(daysAgo(i).toISOString()));
 		}
-		await Bun.write(logPath, lines.join("\n") + "\n");
+		await Bun.write(logPath, `${lines.join("\n")}\n`);
 
 		const result = await rotateLogFile("task", logPath, defaultOptions({ maxEntries: 5 }));
 
@@ -100,7 +100,7 @@ describe("rotateLogFile", () => {
 		for (let i = 0; i < 10; i++) {
 			lines.push(buildEntry(daysAgo(i).toISOString()));
 		}
-		await Bun.write(logPath, lines.join("\n") + "\n");
+		await Bun.write(logPath, `${lines.join("\n")}\n`);
 
 		const result = await rotateLogFile("task", logPath, defaultOptions({ maxEntries: 5 }));
 
@@ -117,7 +117,7 @@ describe("rotateLogFile", () => {
 			buildEntry(daysAgo(5).toISOString()),
 			buildEntry(daysAgo(2).toISOString()),
 		];
-		await Bun.write(logPath, lines.join("\n") + "\n");
+		await Bun.write(logPath, `${lines.join("\n")}\n`);
 
 		const result = await rotateLogFile("task", logPath, defaultOptions({ maxAgeDays: 7 }));
 
@@ -131,7 +131,7 @@ describe("rotateLogFile", () => {
 		for (let i = 0; i < 15; i++) {
 			lines.push(buildEntry(daysAgo(i).toISOString()));
 		}
-		await Bun.write(logPath, lines.join("\n") + "\n");
+		await Bun.write(logPath, `${lines.join("\n")}\n`);
 
 		const result = await rotateLogFile("task", logPath, defaultOptions({ maxEntries: 10 }));
 
@@ -141,11 +141,8 @@ describe("rotateLogFile", () => {
 
 	test("AC-006: dry-run does not modify files", async () => {
 		const logPath = join(tempDir, "task.jsonl");
-		const lines = [
-			buildEntry(daysAgo(60).toISOString()),
-			buildEntry(daysAgo(5).toISOString()),
-		];
-		const originalContent = lines.join("\n") + "\n";
+		const lines = [buildEntry(daysAgo(60).toISOString()), buildEntry(daysAgo(5).toISOString())];
+		const originalContent = `${lines.join("\n")}\n`;
 		await Bun.write(logPath, originalContent);
 
 		const result = await rotateLogFile("task", logPath, defaultOptions({ dryRun: true }));
@@ -166,7 +163,7 @@ describe("rotateLogFile", () => {
 			"{ broken json",
 			buildEntry(daysAgo(2).toISOString()),
 		];
-		await Bun.write(logPath, lines.join("\n") + "\n");
+		await Bun.write(logPath, `${lines.join("\n")}\n`);
 
 		const result = await rotateLogFile("task", logPath, defaultOptions());
 
@@ -178,11 +175,8 @@ describe("rotateLogFile", () => {
 
 	test("AC-014: atomic rewrite via temp file", async () => {
 		const logPath = join(tempDir, "task.jsonl");
-		const lines = [
-			buildEntry(daysAgo(60).toISOString()),
-			buildEntry(daysAgo(5).toISOString()),
-		];
-		await Bun.write(logPath, lines.join("\n") + "\n");
+		const lines = [buildEntry(daysAgo(60).toISOString()), buildEntry(daysAgo(5).toISOString())];
+		await Bun.write(logPath, `${lines.join("\n")}\n`);
 
 		await rotateLogFile("task", logPath, defaultOptions());
 
@@ -219,11 +213,8 @@ describe("rotateLogFile", () => {
 
 	test("skips rewrite when all entries are within thresholds", async () => {
 		const logPath = join(tempDir, "task.jsonl");
-		const lines = [
-			buildEntry(daysAgo(5).toISOString()),
-			buildEntry(daysAgo(2).toISOString()),
-		];
-		const originalContent = lines.join("\n") + "\n";
+		const lines = [buildEntry(daysAgo(5).toISOString()), buildEntry(daysAgo(2).toISOString())];
+		const originalContent = `${lines.join("\n")}\n`;
 		await Bun.write(logPath, originalContent);
 
 		const result = await rotateLogFile("task", logPath, defaultOptions());
@@ -236,11 +227,8 @@ describe("rotateLogFile", () => {
 
 	test("empties file when all entries are outside thresholds", async () => {
 		const logPath = join(tempDir, "task.jsonl");
-		const lines = [
-			buildEntry(daysAgo(60).toISOString()),
-			buildEntry(daysAgo(50).toISOString()),
-		];
-		await Bun.write(logPath, lines.join("\n") + "\n");
+		const lines = [buildEntry(daysAgo(60).toISOString()), buildEntry(daysAgo(50).toISOString())];
+		await Bun.write(logPath, `${lines.join("\n")}\n`);
 
 		const result = await rotateLogFile("task", logPath, defaultOptions());
 
@@ -258,7 +246,7 @@ describe("rotateLogFile", () => {
 			buildEntry(daysAgo(1, now).toISOString()),
 			buildEntry(new Date(now.getTime() - 60000).toISOString()), // 1 minute ago
 		];
-		await Bun.write(logPath, lines.join("\n") + "\n");
+		await Bun.write(logPath, `${lines.join("\n")}\n`);
 
 		const result = await rotateLogFile("task", logPath, defaultOptions({ maxAgeDays: 0, now }));
 
@@ -269,11 +257,8 @@ describe("rotateLogFile", () => {
 
 	test("max-entries 0 removes all entries", async () => {
 		const logPath = join(tempDir, "task.jsonl");
-		const lines = [
-			buildEntry(daysAgo(1).toISOString()),
-			buildEntry(daysAgo(0).toISOString()),
-		];
-		await Bun.write(logPath, lines.join("\n") + "\n");
+		const lines = [buildEntry(daysAgo(1).toISOString()), buildEntry(daysAgo(0).toISOString())];
+		await Bun.write(logPath, `${lines.join("\n")}\n`);
 
 		const result = await rotateLogFile("task", logPath, defaultOptions({ maxEntries: 0 }));
 
@@ -283,12 +268,8 @@ describe("rotateLogFile", () => {
 
 	test("all corrupted lines are dropped and file is emptied", async () => {
 		const logPath = join(tempDir, "task.jsonl");
-		const lines = [
-			"not json 1",
-			"not json 2",
-			"{ broken",
-		];
-		await Bun.write(logPath, lines.join("\n") + "\n");
+		const lines = ["not json 1", "not json 2", "{ broken"];
+		await Bun.write(logPath, `${lines.join("\n")}\n`);
 
 		const result = await rotateLogFile("task", logPath, defaultOptions());
 
@@ -302,12 +283,8 @@ describe("rotateLogFile", () => {
 		const t1 = daysAgo(20).toISOString();
 		const t2 = daysAgo(10).toISOString();
 		const t3 = daysAgo(5).toISOString();
-		const lines = [
-			buildEntry(t1),
-			buildEntry(t2),
-			buildEntry(t3),
-		];
-		await Bun.write(logPath, lines.join("\n") + "\n");
+		const lines = [buildEntry(t1), buildEntry(t2), buildEntry(t3)];
+		await Bun.write(logPath, `${lines.join("\n")}\n`);
 
 		await rotateLogFile("task", logPath, defaultOptions());
 

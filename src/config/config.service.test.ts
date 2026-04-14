@@ -1,7 +1,7 @@
-import { test, expect, describe, beforeEach, afterEach } from "bun:test";
-import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { ConfigRepository } from "./config.repository";
 import { ConfigService, InvalidConfigKeyError, InvalidConfigValueError } from "./config.service";
 
@@ -34,33 +34,23 @@ describe("ConfigService", () => {
 		});
 
 		test("AC-085: rejects ratio > 1", async () => {
-			expect(service.set("default-timeout-ratio", "1.5")).rejects.toThrow(
-				InvalidConfigValueError,
-			);
+			expect(service.set("default-timeout-ratio", "1.5")).rejects.toThrow(InvalidConfigValueError);
 		});
 
 		test("AC-085: rejects negative ratio", async () => {
-			expect(service.set("default-timeout-ratio", "-0.3")).rejects.toThrow(
-				InvalidConfigValueError,
-			);
+			expect(service.set("default-timeout-ratio", "-0.3")).rejects.toThrow(InvalidConfigValueError);
 		});
 
 		test("AC-085: rejects zero ratio", async () => {
-			expect(service.set("default-timeout-ratio", "0")).rejects.toThrow(
-				InvalidConfigValueError,
-			);
+			expect(service.set("default-timeout-ratio", "0")).rejects.toThrow(InvalidConfigValueError);
 		});
 
 		test("rejects non-numeric value", async () => {
-			expect(service.set("default-timeout-ratio", "abc")).rejects.toThrow(
-				InvalidConfigValueError,
-			);
+			expect(service.set("default-timeout-ratio", "abc")).rejects.toThrow(InvalidConfigValueError);
 		});
 
 		test("rejects unknown key", async () => {
-			expect(service.set("unknown-key", "0.5")).rejects.toThrow(
-				InvalidConfigKeyError,
-			);
+			expect(service.set("unknown-key", "0.5")).rejects.toThrow(InvalidConfigKeyError);
 		});
 	});
 

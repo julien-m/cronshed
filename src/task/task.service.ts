@@ -1,19 +1,19 @@
 // @spec FR-002: Task CRUD, FR-003: Validation, FR-005: All operations — .specs/features/001-task-manifest/spec.md#fr-002
 
 import { validateCronExpression } from "../cron/cron.service";
-import type { Task, CreateTaskInput, UpdateTaskInput } from "./task.types";
-import { TASK_NAME_REGEX, TASK_STATUS, TAG_REGEX, normalizeTags } from "./task.types";
-import { TaskRepository } from "./task.repository";
 import {
-	TaskNotFoundError,
 	DuplicateTaskNameError,
-	InvalidTaskNameError,
 	EmptyCommandError,
-	NoChangesSpecifiedError,
-	TaskAlreadyPausedError,
-	TaskAlreadyActiveError,
 	InvalidTagError,
+	InvalidTaskNameError,
+	NoChangesSpecifiedError,
+	TaskAlreadyActiveError,
+	TaskAlreadyPausedError,
+	TaskNotFoundError,
 } from "./task.errors";
+import type { TaskRepository } from "./task.repository";
+import type { CreateTaskInput, Task, UpdateTaskInput } from "./task.types";
+import { normalizeTags, TAG_REGEX, TASK_NAME_REGEX, TASK_STATUS } from "./task.types";
 
 export class TaskService {
 	constructor(private readonly repo: TaskRepository) {}
@@ -122,24 +122,24 @@ export class TaskService {
 			throw new NoChangesSpecifiedError();
 		}
 
-		if (hasCommand && !input.command!.trim()) {
+		if (hasCommand && !input.command?.trim()) {
 			throw new EmptyCommandError();
 		}
 
 		if (hasSchedule) {
-			validateCronExpression(input.schedule!);
+			validateCronExpression(input.schedule ?? "");
 		}
 
 		// Validate tags before any mutation
 		if (hasTags) {
-			for (const tag of input.tags!) {
+			for (const tag of input.tags ?? []) {
 				if (!TAG_REGEX.test(tag)) {
 					throw new InvalidTagError(tag);
 				}
 			}
 		}
 		if (hasUntags) {
-			for (const tag of input.untags!) {
+			for (const tag of input.untags ?? []) {
 				if (!TAG_REGEX.test(tag)) {
 					throw new InvalidTagError(tag);
 				}
@@ -153,14 +153,14 @@ export class TaskService {
 		}
 
 		if (hasSchedule) {
-			task.schedule = input.schedule!;
+			task.schedule = input.schedule ?? task.schedule;
 		}
 		if (hasCommand) {
-			task.command = input.command!;
+			task.command = input.command ?? task.command;
 		}
 		// @spec FR-047: Update notify field — .specs/features/008-failure-notifications/spec.md#fr-047
 		if (hasNotify) {
-			task.notify = input.notify!;
+			task.notify = input.notify ?? task.notify;
 		}
 		// @spec FR-088: Update protection fields — .specs/features/015-wrapper-protections/spec.md#fr-088
 		if (hasAllowParallel) {
@@ -178,12 +178,12 @@ export class TaskService {
 		if (hasTags || hasUntags) {
 			const currentTags = new Set(task.tags);
 			if (hasTags) {
-				for (const tag of input.tags!) {
+				for (const tag of input.tags ?? []) {
 					currentTags.add(tag);
 				}
 			}
 			if (hasUntags) {
-				for (const tag of input.untags!) {
+				for (const tag of input.untags ?? []) {
 					currentTags.delete(tag);
 				}
 			}

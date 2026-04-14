@@ -1,15 +1,15 @@
 // @spec AC-050 through AC-062: Wrapper script integration tests — .specs/features/005-wrapper-script-generation/spec.md#ac-050
 
-import { test, expect, describe, beforeEach, afterEach } from "bun:test";
-import { join } from "node:path";
-import { mkdtemp, rm, readdir, stat, mkdir } from "node:fs/promises";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdir, mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { ShellExecutor } from "../crontab/crontab.adapter";
+import { CrontabAdapter } from "../crontab/crontab.adapter";
+import type { CrontabEntry } from "../crontab/crontab.types";
+import { SyncService } from "../crontab/sync.service";
 import { TaskRepository } from "../task/task.repository";
 import { TaskService } from "../task/task.service";
-import { SyncService } from "../crontab/sync.service";
-import { CrontabAdapter } from "../crontab/crontab.adapter";
-import type { ShellExecutor } from "../crontab/crontab.adapter";
-import type { CrontabEntry } from "../crontab/crontab.types";
 import { WrapperService } from "./wrapper.service";
 
 /** In-memory crontab executor for testing. */
@@ -75,7 +75,11 @@ describe("Wrapper Integration", () => {
 		});
 
 		test("AC-051: wrapper contains the task command", async () => {
-			const task = await service.add({ name: "cleanup-logs", schedule: "0 4 * * 0", command: "find /tmp -name '*.log' -delete" });
+			const task = await service.add({
+				name: "cleanup-logs",
+				schedule: "0 4 * * 0",
+				command: "find /tmp -name '*.log' -delete",
+			});
 			await wrapperService.generate(task);
 
 			const content = await Bun.file(wrapperService.getWrapperPath("cleanup-logs")).text();
@@ -114,7 +118,7 @@ describe("Wrapper Integration", () => {
 			const lines = logContent.trim().split("\n");
 			expect(lines.length).toBe(1);
 
-			const entry = JSON.parse(lines[0]!);
+			const entry = JSON.parse(lines[0] ?? "");
 			expect(entry.exitCode).toBe(0);
 			expect(entry.stdout).toContain("hello");
 			expect(entry.stderr).toBe("");
@@ -157,7 +161,11 @@ describe("Wrapper Integration", () => {
 		});
 
 		test("AC-052: command with stderr is logged", async () => {
-			const task = await service.add({ name: "stderr-task", schedule: "* * * * *", command: "bash -c 'echo warning >&2'" });
+			const task = await service.add({
+				name: "stderr-task",
+				schedule: "* * * * *",
+				command: "bash -c 'echo warning >&2'",
+			});
 			await wrapperService.generate(task);
 
 			const wrapperPath = wrapperService.getWrapperPath("stderr-task");
@@ -224,7 +232,7 @@ describe("Wrapper Integration", () => {
 			const task = await service.add({ name: "backup-db", schedule: "0 2 * * *", command: "echo original" });
 			await wrapperService.generate(task);
 
-			const contentBefore = await Bun.file(wrapperService.getWrapperPath("backup-db")).text();
+			const _contentBefore = await Bun.file(wrapperService.getWrapperPath("backup-db")).text();
 
 			// Update schedule only — wrapper should not need regeneration
 			// (In the CLI handler, this is checked via values.command)

@@ -15,7 +15,7 @@ export class DuplicateTaskNameError extends Error {
 }
 
 export class InvalidTaskNameError extends Error {
-	constructor(name: string) {
+	constructor(_name: string) {
 		super(`Invalid task name. Use lowercase letters, numbers, and hyphens only.`);
 		this.name = "InvalidTaskNameError";
 	}

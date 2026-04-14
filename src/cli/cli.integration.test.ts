@@ -1,7 +1,7 @@
-import { test, expect, describe, beforeEach } from "bun:test";
-import { join } from "node:path";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const CLI = join(import.meta.dir, "../../index.ts");
 
@@ -20,10 +20,7 @@ async function run(...args: string[]) {
 		stderr: "pipe",
 	});
 
-	const [stdout, stderr] = await Promise.all([
-		new Response(proc.stdout).text(),
-		new Response(proc.stderr).text(),
-	]);
+	const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
 	const exitCode = await proc.exited;
 
 	return { stdout: stdout.trim(), stderr: stderr.trim(), exitCode };
@@ -31,7 +28,15 @@ async function run(...args: string[]) {
 
 describe("cronshed add", () => {
 	test("AC-001: creates a task successfully", async () => {
-		const { stdout, exitCode } = await run("add", "backup-db", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
+		const { stdout, exitCode } = await run(
+			"add",
+			"backup-db",
+			"--schedule",
+			"0 2 * * *",
+			"--command",
+			"echo hi",
+			"--no-sync",
+		);
 		expect(exitCode).toBe(0);
 		expect(stdout).toContain("Task backup-db created");
 	});
@@ -45,7 +50,15 @@ describe("cronshed add", () => {
 
 	test("AC-003: rejects duplicate name with exit code 1", async () => {
 		await run("add", "my-task", "--schedule", "0 0 * * *", "--command", "echo hi", "--no-sync");
-		const { stderr, exitCode } = await run("add", "my-task", "--schedule", "0 1 * * *", "--command", "echo dup", "--no-sync");
+		const { stderr, exitCode } = await run(
+			"add",
+			"my-task",
+			"--schedule",
+			"0 1 * * *",
+			"--command",
+			"echo dup",
+			"--no-sync",
+		);
 		expect(exitCode).toBe(1);
 		expect(stderr).toContain('Task "my-task" already exists');
 	});
@@ -210,7 +223,15 @@ describe("command path resolution", () => {
 		const { chmod } = await import("node:fs/promises");
 		await chmod(scriptPath, 0o755);
 
-		const { stdout, exitCode } = await run("add", "scripted", "--schedule", "0 0 * * *", "--command", scriptPath, "--no-sync");
+		const { stdout, exitCode } = await run(
+			"add",
+			"scripted",
+			"--schedule",
+			"0 0 * * *",
+			"--command",
+			scriptPath,
+			"--no-sync",
+		);
 		expect(exitCode).toBe(0);
 		expect(stdout).toContain("Task scripted created");
 		expect(stdout).toContain(scriptPath);
@@ -223,7 +244,15 @@ describe("command path resolution", () => {
 
 	test("AC-024: add with non-existent path gives exit code 2", async () => {
 		const missing = join(tmpDir, "nonexistent.sh");
-		const { stderr, exitCode } = await run("add", "broken", "--schedule", "0 0 * * *", "--command", missing, "--no-sync");
+		const { stderr, exitCode } = await run(
+			"add",
+			"broken",
+			"--schedule",
+			"0 0 * * *",
+			"--command",
+			missing,
+			"--no-sync",
+		);
 		expect(exitCode).toBe(2);
 		expect(stderr).toContain("File not found");
 		expect(stderr).toContain("Resolved to:");
@@ -235,14 +264,30 @@ describe("command path resolution", () => {
 		const { chmod } = await import("node:fs/promises");
 		await chmod(scriptPath, 0o644);
 
-		const { stderr, exitCode } = await run("add", "bad-exec", "--schedule", "0 0 * * *", "--command", scriptPath, "--no-sync");
+		const { stderr, exitCode } = await run(
+			"add",
+			"bad-exec",
+			"--schedule",
+			"0 0 * * *",
+			"--command",
+			scriptPath,
+			"--no-sync",
+		);
 		expect(exitCode).toBe(2);
 		expect(stderr).toContain("not executable");
 		expect(stderr).toContain("chmod +x");
 	});
 
 	test("AC-026: add with inline command stores as-is", async () => {
-		const { stdout, exitCode } = await run("add", "inline", "--schedule", "0 0 * * *", "--command", "echo hello world", "--no-sync");
+		const { stdout, exitCode } = await run(
+			"add",
+			"inline",
+			"--schedule",
+			"0 0 * * *",
+			"--command",
+			"echo hello world",
+			"--no-sync",
+		);
 		expect(exitCode).toBe(0);
 		expect(stdout).toContain("Task inline created");
 
@@ -310,11 +355,13 @@ async function writeLogEntries(taskName: string, entries: Record<string, unknown
 	const { mkdir } = await import("node:fs/promises");
 	const logsDir = join(tmpDir, "logs");
 	await mkdir(logsDir, { recursive: true });
-	const lines = entries.map((e) => JSON.stringify(e)).join("\n") + "\n";
+	const lines = `${entries.map((e) => JSON.stringify(e)).join("\n")}\n`;
 	await Bun.write(join(logsDir, `${taskName}.jsonl`), lines);
 }
 
-function makeHistoryEntry(overrides?: Partial<{ timestamp: string; exitCode: number; durationMs: number; stdout: string; stderr: string }>): Record<string, unknown> {
+function makeHistoryEntry(
+	overrides?: Partial<{ timestamp: string; exitCode: number; durationMs: number; stdout: string; stderr: string }>,
+): Record<string, unknown> {
 	return {
 		timestamp: "2026-03-30T02:00:05Z",
 		exitCode: 0,
@@ -351,7 +398,7 @@ describe("cronshed history", () => {
 	test("AC-004: limits to 10 entries by default", async () => {
 		await run("add", "busy-task", "--schedule", "* * * * *", "--command", "echo hi", "--no-sync");
 		const entries = Array.from({ length: 15 }, (_, i) =>
-			makeHistoryEntry({ timestamp: `2026-03-${String(i + 10).padStart(2, "0")}T02:00:05Z` })
+			makeHistoryEntry({ timestamp: `2026-03-${String(i + 10).padStart(2, "0")}T02:00:05Z` }),
 		);
 		await writeLogEntries("busy-task", entries);
 
@@ -457,11 +504,11 @@ describe("cronshed history", () => {
 		const { mkdir } = await import("node:fs/promises");
 		const logsDir = join(tmpDir, "logs");
 		await mkdir(logsDir, { recursive: true });
-		const lines = [
+		const lines = `${[
 			JSON.stringify(makeHistoryEntry({ timestamp: "2026-03-28T02:00:05Z" })),
 			"this is not valid json",
 			JSON.stringify(makeHistoryEntry({ timestamp: "2026-03-30T02:00:05Z" })),
-		].join("\n") + "\n";
+		].join("\n")}\n`;
 		await Bun.write(join(logsDir, "bad-logs.jsonl"), lines);
 
 		const { stdout, exitCode } = await run("history", "bad-logs");
@@ -655,7 +702,7 @@ describe("cronshed doctor", () => {
 		await run("add", "task-a", "--schedule", "0 2 * * *", "--command", "echo a", "--no-sync");
 		await run("add", "task-b", "--schedule", "0 3 * * *", "--command", "echo b", "--no-sync");
 
-		const { stdout, exitCode } = await run("doctor");
+		const { stdout } = await run("doctor");
 		// Both tasks should appear in output (they may have wrapper/crontab warnings)
 		expect(stdout).toContain("task-a");
 		expect(stdout).toContain("task-b");
@@ -686,7 +733,7 @@ describe("cronshed doctor", () => {
 	test("AC-014: --json outputs valid JSON", async () => {
 		await run("add", "json-task", "--schedule", "0 2 * * *", "--command", "echo hi", "--no-sync");
 
-		const { stdout, exitCode } = await run("doctor", "--json");
+		const { stdout } = await run("doctor", "--json");
 		const parsed = JSON.parse(stdout);
 		expect(Array.isArray(parsed)).toBe(true);
 		expect(parsed).toHaveLength(1);
@@ -732,7 +779,19 @@ describe("cronshed doctor", () => {
 // @spec FR-009: CLI tag flags on add — .specs/features/013-task-groups-tags/spec.md#fr-009
 describe("cronshed add --tag", () => {
 	test("AC-002: creates task with tags", async () => {
-		const { stdout, exitCode } = await run("add", "tagged-task", "--schedule", "0 0 * * *", "--command", "echo hi", "--tag", "backup", "--tag", "db", "--no-sync");
+		const { stdout, exitCode } = await run(
+			"add",
+			"tagged-task",
+			"--schedule",
+			"0 0 * * *",
+			"--command",
+			"echo hi",
+			"--tag",
+			"backup",
+			"--tag",
+			"db",
+			"--no-sync",
+		);
 		expect(exitCode).toBe(0);
 		expect(stdout).toContain("Task tagged-task created");
 
@@ -751,13 +810,35 @@ describe("cronshed add --tag", () => {
 	});
 
 	test("AC-004: rejects invalid tag with exit code 2", async () => {
-		const { stderr, exitCode } = await run("add", "bad-tag", "--schedule", "0 0 * * *", "--command", "echo hi", "--tag", "BAD TAG", "--no-sync");
+		const { stderr, exitCode } = await run(
+			"add",
+			"bad-tag",
+			"--schedule",
+			"0 0 * * *",
+			"--command",
+			"echo hi",
+			"--tag",
+			"BAD TAG",
+			"--no-sync",
+		);
 		expect(exitCode).toBe(2);
 		expect(stderr).toContain("Invalid tag");
 	});
 
 	test("AC-007: deduplicates tags on creation", async () => {
-		const { exitCode } = await run("add", "dup-tags", "--schedule", "0 0 * * *", "--command", "echo hi", "--tag", "backup", "--tag", "backup", "--no-sync");
+		const { exitCode } = await run(
+			"add",
+			"dup-tags",
+			"--schedule",
+			"0 0 * * *",
+			"--command",
+			"echo hi",
+			"--tag",
+			"backup",
+			"--tag",
+			"backup",
+			"--no-sync",
+		);
 		expect(exitCode).toBe(0);
 
 		const { stdout: details } = await run("get", "dup-tags", "--json");
@@ -780,7 +861,19 @@ describe("cronshed update --tag/--untag", () => {
 	});
 
 	test("AC-005: removes a tag from existing task", async () => {
-		await run("add", "my-task", "--schedule", "0 0 * * *", "--command", "echo hi", "--tag", "backup", "--tag", "db", "--no-sync");
+		await run(
+			"add",
+			"my-task",
+			"--schedule",
+			"0 0 * * *",
+			"--command",
+			"echo hi",
+			"--tag",
+			"backup",
+			"--tag",
+			"db",
+			"--no-sync",
+		);
 		const { exitCode } = await run("update", "my-task", "--untag", "db", "--no-sync");
 		expect(exitCode).toBe(0);
 
@@ -816,7 +909,19 @@ describe("cronshed update --tag/--untag", () => {
 // @spec FR-011: List filter by tag — .specs/features/013-task-groups-tags/spec.md#fr-011
 describe("cronshed list --tag", () => {
 	test("AC-008: filters tasks by tag", async () => {
-		await run("add", "db-backup", "--schedule", "0 0 * * *", "--command", "echo a", "--tag", "backup", "--tag", "db", "--no-sync");
+		await run(
+			"add",
+			"db-backup",
+			"--schedule",
+			"0 0 * * *",
+			"--command",
+			"echo a",
+			"--tag",
+			"backup",
+			"--tag",
+			"db",
+			"--no-sync",
+		);
 		await run("add", "log-clean", "--schedule", "0 1 * * *", "--command", "echo b", "--tag", "cleanup", "--no-sync");
 		await run("add", "db-migrate", "--schedule", "0 2 * * *", "--command", "echo c", "--tag", "db", "--no-sync");
 
@@ -849,7 +954,19 @@ describe("cronshed list --tag", () => {
 // @spec FR-012: Tags subcommand — .specs/features/013-task-groups-tags/spec.md#fr-012
 describe("cronshed tags", () => {
 	test("AC-010: displays tags with task counts", async () => {
-		await run("add", "task-a", "--schedule", "0 0 * * *", "--command", "echo a", "--tag", "backup", "--tag", "db", "--no-sync");
+		await run(
+			"add",
+			"task-a",
+			"--schedule",
+			"0 0 * * *",
+			"--command",
+			"echo a",
+			"--tag",
+			"backup",
+			"--tag",
+			"db",
+			"--no-sync",
+		);
 		await run("add", "task-b", "--schedule", "0 1 * * *", "--command", "echo b", "--tag", "backup", "--no-sync");
 		await run("add", "task-c", "--schedule", "0 2 * * *", "--command", "echo c", "--tag", "cleanup", "--no-sync");
 
@@ -871,7 +988,19 @@ describe("cronshed tags", () => {
 
 	test("AC-011: --json outputs tag counts", async () => {
 		await run("add", "task-a", "--schedule", "0 0 * * *", "--command", "echo a", "--tag", "backup", "--no-sync");
-		await run("add", "task-b", "--schedule", "0 1 * * *", "--command", "echo b", "--tag", "backup", "--tag", "db", "--no-sync");
+		await run(
+			"add",
+			"task-b",
+			"--schedule",
+			"0 1 * * *",
+			"--command",
+			"echo b",
+			"--tag",
+			"backup",
+			"--tag",
+			"db",
+			"--no-sync",
+		);
 
 		const { stdout, exitCode } = await run("tags", "--json");
 		expect(exitCode).toBe(0);
@@ -889,7 +1018,19 @@ describe("cronshed tags", () => {
 // @spec FR-013: Tags in get output — .specs/features/013-task-groups-tags/spec.md#fr-013
 describe("cronshed get with tags", () => {
 	test("AC-012: get shows tags for tagged task", async () => {
-		await run("add", "my-task", "--schedule", "0 0 * * *", "--command", "echo hi", "--tag", "backup", "--tag", "db", "--no-sync");
+		await run(
+			"add",
+			"my-task",
+			"--schedule",
+			"0 0 * * *",
+			"--command",
+			"echo hi",
+			"--tag",
+			"backup",
+			"--tag",
+			"db",
+			"--no-sync",
+		);
 		const { stdout, exitCode } = await run("get", "my-task");
 		expect(exitCode).toBe(0);
 		expect(stdout).toContain("Tags:");
@@ -939,7 +1080,15 @@ describe("cronshed update --allow-parallel", () => {
 describe("cronshed add — short schedule warning", () => {
 	test("AC-083: short-schedule warning printed to stderr when schedule <= 60s, no --timeout, no ratio", async () => {
 		// Schedule every minute (interval = 60s) without timeout
-		const { stderr, exitCode } = await run("add", "frequent-task", "--schedule", "* * * * *", "--command", "echo hi", "--no-sync");
+		const { stderr, exitCode } = await run(
+			"add",
+			"frequent-task",
+			"--schedule",
+			"* * * * *",
+			"--command",
+			"echo hi",
+			"--no-sync",
+		);
 		expect(exitCode).toBe(0);
 		expect(stderr).toContain("Schedule runs every minute");
 		expect(stderr).toContain("--timeout");
@@ -947,7 +1096,15 @@ describe("cronshed add — short schedule warning", () => {
 
 	test("AC-083: no warning when schedule > 60s", async () => {
 		// Schedule every 5 minutes (interval = 300s)
-		const { stderr, exitCode } = await run("add", "normal-task", "--schedule", "*/5 * * * *", "--command", "echo hi", "--no-sync");
+		const { stderr, exitCode } = await run(
+			"add",
+			"normal-task",
+			"--schedule",
+			"*/5 * * * *",
+			"--command",
+			"echo hi",
+			"--no-sync",
+		);
 		expect(exitCode).toBe(0);
 		expect(stderr).not.toContain("Schedule runs every minute");
 	});
@@ -958,15 +1115,17 @@ describe("backward compatibility — tags", () => {
 	test("AC-014: loads old manifest without tags field", async () => {
 		const manifest = {
 			version: 1,
-			tasks: [{
-				id: "old-id",
-				name: "legacy-task",
-				schedule: "0 0 * * *",
-				command: "echo legacy",
-				status: "active",
-				notify: false,
-				createdAt: "2026-01-01T00:00:00.000Z",
-			}],
+			tasks: [
+				{
+					id: "old-id",
+					name: "legacy-task",
+					schedule: "0 0 * * *",
+					command: "echo legacy",
+					status: "active",
+					notify: false,
+					createdAt: "2026-01-01T00:00:00.000Z",
+				},
+			],
 		};
 		await Bun.write(join(tmpDir, "tasks.json"), JSON.stringify(manifest));
 

@@ -1,7 +1,7 @@
 // @spec FR-001: Data directory configuration — .specs/features/001-task-manifest/spec.md#fr-001
 
-import { join } from "node:path";
 import { homedir } from "node:os";
+import { join } from "node:path";
 
 /**
  * Get the data directory for cronshed.
@@ -9,7 +9,7 @@ import { homedir } from "node:os";
  * @returns Absolute path to data directory
  */
 export function getDataDir(): string {
-	return process.env["CRONSHED_HOME"] ?? join(homedir(), ".cronshed");
+	return process.env.CRONSHED_HOME ?? join(homedir(), ".cronshed");
 }
 
 /**

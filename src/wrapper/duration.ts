@@ -18,21 +18,18 @@ const UNIT_MULTIPLIERS: Record<string, number> = {
 export function parseDuration(input: string): number {
 	const match = DURATION_REGEX.exec(input);
 	if (!match) {
-		throw new Error(
-			`Invalid timeout duration "${input}". Use format: <N>s, <N>m, or <N>h (e.g., "30s", "5m", "2h")`,
-		);
+		throw new Error(`Invalid timeout duration "${input}". Use format: <N>s, <N>m, or <N>h (e.g., "30s", "5m", "2h")`);
 	}
 
-	const value = parseInt(match[1]!, 10);
-	const unit = match[2]!;
+	const valueText = match[1] ?? "";
+	const unit = match[2] ?? "";
+	const value = parseInt(valueText, 10);
 
 	if (value === 0) {
-		throw new Error(
-			`Invalid timeout duration "${input}". Use format: <N>s, <N>m, or <N>h (e.g., "30s", "5m", "2h")`,
-		);
+		throw new Error(`Invalid timeout duration "${input}". Use format: <N>s, <N>m, or <N>h (e.g., "30s", "5m", "2h")`);
 	}
 
-	return value * UNIT_MULTIPLIERS[unit]!;
+	return value * (UNIT_MULTIPLIERS[unit] ?? 0);
 }
 
 /**

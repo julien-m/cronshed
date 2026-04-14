@@ -1,10 +1,9 @@
-import { test, expect, describe } from "bun:test";
-import { SyncService } from "./sync.service";
-import type { SyncOptions } from "./sync.service";
-import type { CrontabEntry, ParsedCrontab } from "./crontab.types";
-import type { CrontabAdapter } from "./crontab.adapter";
+import { describe, expect, test } from "bun:test";
 import type { TaskRepository } from "../task/task.repository";
-import type { TaskManifest, Task } from "../task/task.types";
+import type { Task, TaskManifest } from "../task/task.types";
+import type { CrontabAdapter } from "./crontab.adapter";
+import type { CrontabEntry, ParsedCrontab } from "./crontab.types";
+import { SyncService } from "./sync.service";
 
 function buildTask(overrides?: Partial<Task>): Task {
 	return {
@@ -28,7 +27,9 @@ function mockRepo(tasks: Task[]): TaskRepository {
 	} as TaskRepository;
 }
 
-function mockAdapter(crontab: ParsedCrontab): CrontabAdapter & { written: { userLines: string[]; entries: CrontabEntry[] } | null } {
+function mockAdapter(
+	crontab: ParsedCrontab,
+): CrontabAdapter & { written: { userLines: string[]; entries: CrontabEntry[] } | null } {
 	const mock = {
 		written: null as { userLines: string[]; entries: CrontabEntry[] } | null,
 		async read(): Promise<ParsedCrontab> {
@@ -55,7 +56,7 @@ describe("SyncService.sync", () => {
 		expect(result.removed).toBe(0);
 		expect(result.isUpToDate).toBe(false);
 		expect(adapter.written).not.toBeNull();
-		expect(adapter.written!.entries[0]!.taskName).toBe("backup-db");
+		expect(adapter.written?.entries[0]?.taskName).toBe("backup-db");
 	});
 
 	test("AC-032: updates entry when schedule changes", async () => {
@@ -71,9 +72,9 @@ describe("SyncService.sync", () => {
 
 		expect(result.updated).toBe(1);
 		expect(result.installed).toBe(0);
-		expect(result.diff[0]!.type).toBe("update");
-		expect(result.diff[0]!.oldSchedule).toBe("0 2 * * *");
-		expect(result.diff[0]!.schedule).toBe("0 3 * * *");
+		expect(result.diff[0]?.type).toBe("update");
+		expect(result.diff[0]?.oldSchedule).toBe("0 2 * * *");
+		expect(result.diff[0]?.schedule).toBe("0 3 * * *");
 	});
 
 	test("AC-032: updates entry when command changes", async () => {
@@ -88,7 +89,7 @@ describe("SyncService.sync", () => {
 		const result = await service.sync();
 
 		expect(result.updated).toBe(1);
-		expect(result.diff[0]!.oldCommand).toBe("/usr/local/bin/backup.sh");
+		expect(result.diff[0]?.oldCommand).toBe("/usr/local/bin/backup.sh");
 	});
 
 	test("AC-031: removes orphaned cronshed entry", async () => {
@@ -102,8 +103,8 @@ describe("SyncService.sync", () => {
 		const result = await service.sync();
 
 		expect(result.removed).toBe(1);
-		expect(result.diff[0]!.type).toBe("remove");
-		expect(adapter.written!.entries).toHaveLength(0);
+		expect(result.diff[0]?.type).toBe("remove");
+		expect(adapter.written?.entries).toHaveLength(0);
 	});
 
 	test("AC-034: idempotent sync (no changes needed)", async () => {
@@ -170,8 +171,8 @@ describe("SyncService.sync", () => {
 
 		expect(result.removed).toBe(1);
 		expect(adapter.written).not.toBeNull();
-		expect(adapter.written!.entries).toHaveLength(0);
-		expect(adapter.written!.userLines).toEqual(["30 3 * * * /usr/bin/custom-job"]);
+		expect(adapter.written?.entries).toHaveLength(0);
+		expect(adapter.written?.userLines).toEqual(["30 3 * * * /usr/bin/custom-job"]);
 	});
 
 	test("AC-039: missing manifest with clean crontab is no-op", async () => {
@@ -196,7 +197,7 @@ describe("SyncService.sync", () => {
 
 		await service.sync();
 
-		expect(adapter.written!.userLines).toEqual(["SHELL=/bin/bash", "30 3 * * * /usr/bin/custom-job"]);
+		expect(adapter.written?.userLines).toEqual(["SHELL=/bin/bash", "30 3 * * * /usr/bin/custom-job"]);
 	});
 });
 
@@ -213,8 +214,8 @@ describe("SyncService.sync — paused task filtering", () => {
 
 		expect(result.installed).toBe(1);
 		expect(result.total).toBe(1);
-		expect(adapter.written!.entries).toHaveLength(1);
-		expect(adapter.written!.entries[0]!.taskName).toBe("active-task");
+		expect(adapter.written?.entries).toHaveLength(1);
+		expect(adapter.written?.entries[0]?.taskName).toBe("active-task");
 	});
 
 	test("AC-010: only active tasks are installed in crontab", async () => {
@@ -229,7 +230,7 @@ describe("SyncService.sync — paused task filtering", () => {
 
 		expect(result.installed).toBe(2);
 		expect(result.total).toBe(2);
-		expect(adapter.written!.entries.map((e: CrontabEntry) => e.taskName)).toEqual(["task-a", "task-c"]);
+		expect(adapter.written?.entries.map((e: CrontabEntry) => e.taskName)).toEqual(["task-a", "task-c"]);
 	});
 
 	test("AC-011: dry-run does not show paused tasks", async () => {
@@ -256,7 +257,7 @@ describe("SyncService.sync — paused task filtering", () => {
 		const result = await service.sync();
 
 		expect(result.removed).toBe(1);
-		expect(adapter.written!.entries).toHaveLength(0);
+		expect(adapter.written?.entries).toHaveLength(0);
 	});
 
 	test("all paused tasks are excluded from sync", async () => {
@@ -288,8 +289,8 @@ describe("SyncService.sync --clear", () => {
 		const result = await service.sync({ clear: true });
 
 		expect(result.removed).toBe(2);
-		expect(adapter.written!.entries).toHaveLength(0);
-		expect(adapter.written!.userLines).toEqual(["30 3 * * * /usr/bin/custom-job"]);
+		expect(adapter.written?.entries).toHaveLength(0);
+		expect(adapter.written?.userLines).toEqual(["30 3 * * * /usr/bin/custom-job"]);
 	});
 
 	test("AC-037: no-op when no cronshed entries exist", async () => {
@@ -316,7 +317,7 @@ describe("SyncService.sync --clear", () => {
 
 		expect(result.removed).toBe(1);
 		expect(result.diff).toHaveLength(1);
-		expect(result.diff[0]!.type).toBe("remove");
+		expect(result.diff[0]?.type).toBe("remove");
 		expect(adapter.written).toBeNull();
 	});
 });

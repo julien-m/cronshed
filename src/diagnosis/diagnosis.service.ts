@@ -1,23 +1,23 @@
 // @spec FR-063: DiagnosisService — .specs/features/010-task-diagnosis/spec.md#fr-063
 
-import { join, resolve } from "node:path";
-import { stat, access } from "node:fs/promises";
 import { constants } from "node:fs";
+import { access, stat } from "node:fs/promises";
 import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import { parseExpression } from "cron-parser";
-import type { Task } from "../task/task.types";
-import { TASK_STATUS } from "../task/task.types";
-import type { TaskRepository } from "../task/task.repository";
+import { isFilePath } from "../cli/command.resolver";
 import type { CrontabAdapter } from "../crontab/crontab.adapter";
 import type { CrontabEntry } from "../crontab/crontab.types";
+import type { TaskRepository } from "../task/task.repository";
+import type { Task } from "../task/task.types";
+import { TASK_STATUS } from "../task/task.types";
+import { parseDuration } from "../wrapper/duration";
 import type { WrapperService } from "../wrapper/wrapper.service";
 import { computeLockHash } from "../wrapper/wrapper.service";
 import type { WrapperTimeoutConfig } from "../wrapper/wrapper.types";
-import type { DiagnosisResult, DiagnosisIssue } from "./diagnosis.types";
-import { DIAGNOSIS_CHECKS } from "./diagnosis.types";
 import { MAX_OUTPUT_BYTES } from "../wrapper/wrapper.types";
-import { isFilePath } from "../cli/command.resolver";
-import { parseDuration } from "../wrapper/duration";
+import type { DiagnosisIssue, DiagnosisResult } from "./diagnosis.types";
+import { DIAGNOSIS_CHECKS } from "./diagnosis.types";
 
 export class DiagnosisService {
 	private readonly logsDir: string;
@@ -123,7 +123,7 @@ export class DiagnosisService {
 		}
 
 		// Extract the file path (first token, before arguments)
-		const firstToken = task.command.split(" ")[0]!;
+		const firstToken = task.command.split(" ")[0] ?? "";
 		let filePath: string;
 		if (firstToken.startsWith("~/")) {
 			filePath = resolve(homedir(), firstToken.slice(2));
@@ -198,9 +198,7 @@ export class DiagnosisService {
 		const isParallel = task.allowParallel ?? false;
 		const locksDir = !isParallel ? join(this.dataDir, "locks") : undefined;
 		const configPath = this.repo.getPath();
-		const lockFilePath = !isParallel
-			? `$CRONSHED_LOCK_DIR/${computeLockHash(configPath, task.name)}.lock`
-			: undefined;
+		const lockFilePath = !isParallel ? `$CRONSHED_LOCK_DIR/${computeLockHash(configPath, task.name)}.lock` : undefined;
 
 		// Resolve timeout config for comparison
 		let timeoutConfig: WrapperTimeoutConfig | undefined;
@@ -210,7 +208,7 @@ export class DiagnosisService {
 				// We cannot async detect the tool here, so read it from the on-disk wrapper
 				const toolMatch = onDiskContent.match(/CRONSHED_TIMEOUT_CMD="([^"]+)"/);
 				if (toolMatch) {
-					timeoutConfig = { seconds, tool: toolMatch[1]! };
+					timeoutConfig = { seconds, tool: toolMatch[1] ?? "" };
 				}
 			} catch {
 				// If duration is invalid, skip timeout comparison
@@ -222,7 +220,7 @@ export class DiagnosisService {
 		if (!isParallel) {
 			const flockMatch = onDiskContent.match(/^\s+(\S+flock) -n 9/m);
 			if (flockMatch) {
-				flockPath = flockMatch[1]!;
+				flockPath = flockMatch[1] ?? "";
 			}
 		}
 
@@ -239,8 +237,7 @@ export class DiagnosisService {
 			flockPath,
 		});
 
-		const stripTimestamp = (content: string): string =>
-			content.replace(/^# Generated: .*$/m, "");
+		const stripTimestamp = (content: string): string => content.replace(/^# Generated: .*$/m, "");
 
 		if (stripTimestamp(onDiskContent) !== stripTimestamp(expectedContent)) {
 			issues.push({

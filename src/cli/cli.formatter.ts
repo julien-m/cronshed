@@ -5,28 +5,26 @@
 //   - formatters/ops.formatter.ts    — sync, diagnosis, import, rotation, run, tags
 
 export {
-	formatSuccess,
-	formatError,
-	formatWarning,
-	formatSyncConfirmation,
 	formatDuration,
+	formatError,
+	formatSuccess,
+	formatSyncConfirmation,
+	formatWarning,
 } from "./formatters/base.formatter";
-
 export {
-	formatTaskTable,
-	formatTaskDetails,
-	formatHistoryTable,
-} from "./formatters/task.formatter";
-
-export {
-	formatSyncResult,
-	formatSyncDiff,
 	formatDiagnosisReport,
 	formatDiagnosisSummary,
 	formatImportPreview,
 	formatImportSummary,
-	formatSkippedWarning,
 	formatRotationSummary,
 	formatRunSummary,
+	formatSkippedWarning,
+	formatSyncDiff,
+	formatSyncResult,
 	formatTagsTable,
 } from "./formatters/ops.formatter";
+export {
+	formatHistoryTable,
+	formatTaskDetails,
+	formatTaskTable,
+} from "./formatters/task.formatter";

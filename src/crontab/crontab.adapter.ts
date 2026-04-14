@@ -1,8 +1,8 @@
 // @spec FR-020: Crontab read/write, FR-021: Marker format, FR-023: Output ordering, FR-026: Empty crontab, FR-028: Orphaned markers — .specs/features/003-crontab-sync/spec.md#fr-020
 
+import { CrontabReadError, CrontabWriteError } from "./crontab.errors";
 import type { CrontabEntry, ParsedCrontab } from "./crontab.types";
 import { CRONSHED_MARKER_PREFIX } from "./crontab.types";
-import { CrontabReadError, CrontabWriteError } from "./crontab.errors";
 
 /** Shell executor interface for testability. */
 export interface ShellExecutor {
@@ -16,10 +16,7 @@ export const DEFAULT_EXECUTOR: ShellExecutor = {
 			stdout: "pipe",
 			stderr: "pipe",
 		});
-		const [stdout, stderr] = await Promise.all([
-			new Response(proc.stdout).text(),
-			new Response(proc.stderr).text(),
-		]);
+		const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
 		const exitCode = await proc.exited;
 		return { stdout, stderr, exitCode };
 	},
@@ -96,7 +93,7 @@ export class CrontabAdapter {
 
 		let i = 0;
 		while (i < lines.length) {
-			const line = lines[i]!;
+			const line = lines[i] ?? "";
 			const taskName = parseMarker(line);
 
 			if (taskName) {
@@ -126,7 +123,7 @@ export class CrontabAdapter {
 		}
 
 		// Trim trailing empty lines from userLines
-		while (userLines.length > 0 && userLines[userLines.length - 1]!.trim() === "") {
+		while (userLines.length > 0 && userLines[userLines.length - 1]?.trim() === "") {
 			userLines.pop();
 		}
 
@@ -182,6 +179,6 @@ export class CrontabAdapter {
 			parts.push(`${entry.schedule} ${entry.command}`);
 		}
 
-		return parts.join("\n") + "\n";
+		return `${parts.join("\n")}\n`;
 	}
 }

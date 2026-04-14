@@ -9,6 +9,8 @@ import { getLogPath } from "../app/config";
 import type { Task } from "../task/task.types";
 import type { RotationOptions, RotationResult } from "./rotation.types";
 
+export type { RotationResult } from "./rotation.types";
+
 /** Default maximum age in days for log entries. */
 export const DEFAULT_MAX_AGE_DAYS = 30;
 
@@ -25,7 +27,7 @@ function parseLineTimestamp(line: string): { date: Date; line: string } | null {
 		const entry = JSON.parse(line);
 		if (typeof entry.timestamp === "string") {
 			const date = new Date(entry.timestamp);
-			if (!isNaN(date.getTime())) {
+			if (!Number.isNaN(date.getTime())) {
 				return { date, line };
 			}
 		}
@@ -65,9 +67,7 @@ export async function rotateLogFile(
 	const rawLines = content.split("\n").filter((line) => line.trim().length > 0);
 
 	// Parse all lines, dropping corrupted entries
-	const parsed = rawLines
-		.map(parseLineTimestamp)
-		.filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+	const parsed = rawLines.map(parseLineTimestamp).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
 	const entriesBefore = parsed.length;
 	const now = options.now ?? new Date();
@@ -91,9 +91,7 @@ export async function rotateLogFile(
 
 	// Atomic rewrite: write to temp, then rename
 	const tmpPath = `${logPath}.tmp`;
-	const newContent = filtered.length > 0
-		? filtered.map((entry) => entry.line).join("\n") + "\n"
-		: "";
+	const newContent = filtered.length > 0 ? `${filtered.map((entry) => entry.line).join("\n")}\n` : "";
 
 	await Bun.write(tmpPath, newContent);
 	await rename(tmpPath, logPath);
@@ -107,10 +105,7 @@ export async function rotateLogFile(
  * @param options Rotation options
  * @returns Array of rotation results (one per task)
  */
-export async function rotateAllLogs(
-	tasks: Task[],
-	options: RotationOptions,
-): Promise<RotationResult[]> {
+export async function rotateAllLogs(tasks: Task[], options: RotationOptions): Promise<RotationResult[]> {
 	const results: RotationResult[] = [];
 
 	for (const task of tasks) {

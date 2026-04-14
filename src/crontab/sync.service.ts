@@ -1,11 +1,11 @@
 // @spec FR-022: Sync algorithm, FR-024: Dry-run, FR-025: Clear — .specs/features/003-crontab-sync/spec.md#fr-022
 
+import type { TaskRepository } from "../task/task.repository";
 import type { Task } from "../task/task.types";
 import { TASK_STATUS } from "../task/task.types";
-import type { TaskRepository } from "../task/task.repository";
-import type { CrontabEntry } from "./crontab.types";
-import type { CrontabAdapter } from "./crontab.adapter";
 import type { WrapperService } from "../wrapper/wrapper.service";
+import type { CrontabAdapter } from "./crontab.adapter";
+import type { CrontabEntry } from "./crontab.types";
 
 export interface SyncOptions {
 	dryRun?: boolean;
@@ -117,9 +117,7 @@ export class SyncService {
 		// Build entries with wrapper paths when wrapperService is available
 		const crontabTasks = tasks.map((t) => ({
 			...t,
-			command: this.wrapperService
-				? this.wrapperService.getWrapperPath(t.name)
-				: t.command,
+			command: this.wrapperService ? this.wrapperService.getWrapperPath(t.name) : t.command,
 		}));
 
 		const crontab = await this.adapter.read();

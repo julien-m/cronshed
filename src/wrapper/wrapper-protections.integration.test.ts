@@ -1,10 +1,10 @@
 // @spec FR-086: Flock integration, FR-090: Timeout integration, FR-091: timedOut — .specs/features/015-wrapper-protections/spec.md#fr-086
 
-import { test, expect, describe, beforeEach, afterEach, beforeAll } from "bun:test";
-import { join } from "node:path";
+import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { WrapperService, computeLockHash } from "./wrapper.service";
+import { join } from "node:path";
+import { computeLockHash, WrapperService } from "./wrapper.service";
 
 /** Check if a command is available on PATH. */
 async function isToolAvailable(tool: string): Promise<boolean> {
@@ -17,14 +17,14 @@ describe("Wrapper Protections Integration", () => {
 	let service: WrapperService;
 	let hasFlockTool: boolean;
 	let hasTimeoutTool: boolean;
-	let timeoutToolName: string;
+	let _timeoutToolName: string;
 
 	beforeAll(async () => {
 		hasFlockTool = await isToolAvailable("flock");
 		const hasGtimeout = await isToolAvailable("gtimeout");
 		const hasTimeout = await isToolAvailable("timeout");
 		hasTimeoutTool = hasGtimeout || hasTimeout;
-		timeoutToolName = hasGtimeout ? "gtimeout" : "timeout";
+		_timeoutToolName = hasGtimeout ? "gtimeout" : "timeout";
 	});
 
 	beforeEach(async () => {
@@ -76,7 +76,10 @@ describe("Wrapper Protections Integration", () => {
 
 			// Read log file and check for skip entry
 			const logContent = await readFile(logPath, "utf-8");
-			const entries = logContent.trim().split("\n").map((line) => JSON.parse(line));
+			const entries = logContent
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line));
 
 			const skipEntry = entries.find((e: Record<string, unknown>) => e.skipped === true);
 			expect(skipEntry).toBeDefined();
@@ -119,7 +122,10 @@ describe("Wrapper Protections Integration", () => {
 			expect(exitCode2).toBe(0);
 
 			const logContent = await readFile(join(dataDir, "logs", "quick-task.jsonl"), "utf-8");
-			const entries = logContent.trim().split("\n").map((line) => JSON.parse(line));
+			const entries = logContent
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line));
 			expect(entries.length).toBe(2);
 			expect(entries.every((e: Record<string, unknown>) => !e.skipped)).toBe(true);
 		}, 10000);
@@ -150,7 +156,10 @@ describe("Wrapper Protections Integration", () => {
 			await Promise.all([proc1.exited, proc2.exited]);
 
 			const logContent = await readFile(join(dataDir, "logs", "parallel-task.jsonl"), "utf-8");
-			const entries = logContent.trim().split("\n").map((line) => JSON.parse(line));
+			const entries = logContent
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line));
 			expect(entries.length).toBe(2);
 			expect(entries.every((e: Record<string, unknown>) => !e.skipped)).toBe(true);
 		}, 10000);
@@ -256,7 +265,10 @@ describe("Wrapper Protections Integration", () => {
 			expect(exitCode1).toBe(124);
 
 			const logContent = await readFile(join(dataDir, "logs", "combo-task.jsonl"), "utf-8");
-			const entries = logContent.trim().split("\n").map((line) => JSON.parse(line));
+			const entries = logContent
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line));
 
 			const skipEntries = entries.filter((e: Record<string, unknown>) => e.skipped === true);
 			const timeoutEntries = entries.filter((e: Record<string, unknown>) => e.timedOut === true);

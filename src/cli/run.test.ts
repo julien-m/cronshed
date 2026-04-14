@@ -1,9 +1,10 @@
 // @spec FR-001: Run command tests — .specs/features/014-dry-run-mode/spec.md#fr-001
 
-import { test, expect, describe, beforeEach, afterEach } from "bun:test";
-import { mkdtemp, rm, mkdir, chmod } from "node:fs/promises";
-import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { TaskManifest, TaskStatus } from "../task/task.types";
 import { formatRunSummary } from "./cli.formatter";
 
 // ─── formatRunSummary unit tests ───
@@ -72,9 +73,9 @@ describe("cronshed run", () => {
 	/**
 	 * Helper: create a task directly in the manifest.
 	 */
-	async function createTask(name: string, command: string, opts?: { status?: string; notify?: boolean }) {
+	async function createTask(name: string, command: string, opts?: { status?: TaskStatus; notify?: boolean }) {
 		const manifestPath = join(tmpDir, "tasks.json");
-		let manifest: { version: 1; tasks: any[] };
+		let manifest: TaskManifest;
 
 		const file = Bun.file(manifestPath);
 		if (await file.exists()) {
@@ -249,10 +250,13 @@ describe("cronshed run", () => {
 		expect(await logFile.exists()).toBe(true);
 
 		const content = await logFile.text();
-		const lines = content.trim().split("\n").filter((l) => l.trim());
+		const lines = content
+			.trim()
+			.split("\n")
+			.filter((l) => l.trim());
 		expect(lines.length).toBeGreaterThanOrEqual(1);
 
-		const entry = JSON.parse(lines[lines.length - 1]!);
+		const entry = JSON.parse(lines.at(-1) ?? "");
 		expect(entry.exitCode).toBe(0);
 		expect(typeof entry.durationMs).toBe("number");
 		expect(typeof entry.timestamp).toBe("string");

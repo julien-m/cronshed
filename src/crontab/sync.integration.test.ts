@@ -1,16 +1,14 @@
-import { test, expect, describe, beforeEach } from "bun:test";
-import { join } from "node:path";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { formatSyncDiff, formatSyncResult } from "../cli/cli.formatter";
 import { TaskRepository } from "../task/task.repository";
 import { TaskService } from "../task/task.service";
-import { SyncService } from "./sync.service";
-import { CrontabAdapter } from "./crontab.adapter";
 import type { ShellExecutor } from "./crontab.adapter";
+import { CrontabAdapter } from "./crontab.adapter";
 import type { CrontabEntry } from "./crontab.types";
-import { CRONSHED_MARKER_PREFIX } from "./crontab.types";
-import { CrontabWriteError } from "./crontab.errors";
-import { formatSyncResult, formatSyncDiff } from "../cli/cli.formatter";
+import { SyncService } from "./sync.service";
 
 /** In-memory crontab executor for integration tests. */
 function createMemoryCrontab(initialContent: string = ""): ShellExecutor & { content: string } {
@@ -85,11 +83,7 @@ describe("Sync integration — full pipeline", () => {
 		const taskService = new TaskService(repo);
 		await taskService.add({ name: "backup-db", schedule: "0 2 * * *", command: "/usr/local/bin/backup.sh" });
 
-		const existingCrontab = [
-			"# cronshed:backup-db",
-			"0 2 * * * /usr/local/bin/backup.sh",
-			"",
-		].join("\n");
+		const existingCrontab = ["# cronshed:backup-db", "0 2 * * * /usr/local/bin/backup.sh", ""].join("\n");
 
 		const adapter = createTestAdapter(existingCrontab);
 		const syncService = new SyncService(repo, adapter);
@@ -197,11 +191,7 @@ describe("Sync integration — full pipeline", () => {
 	test("AC-041: clear with dry-run shows entries without writing", async () => {
 		const repo = new TaskRepository(join(tmpDir, "tasks.json"));
 
-		const existingCrontab = [
-			"# cronshed:task-a",
-			"0 1 * * * echo a",
-			"",
-		].join("\n");
+		const existingCrontab = ["# cronshed:task-a", "0 1 * * * echo a", ""].join("\n");
 
 		const adapter = createTestAdapter(existingCrontab);
 		const syncService = new SyncService(repo, adapter);
@@ -233,7 +223,7 @@ describe("Sync integration — full pipeline", () => {
 			content.indexOf("# cronshed:m-task"),
 			content.indexOf("# cronshed:z-task"),
 		];
-		expect(markerIndices[0]).toBeLessThan(markerIndices[1]!);
-		expect(markerIndices[1]).toBeLessThan(markerIndices[2]!);
+		expect(markerIndices[0]).toBeLessThan(markerIndices[1] ?? Number.POSITIVE_INFINITY);
+		expect(markerIndices[1] ?? Number.NEGATIVE_INFINITY).toBeLessThan(markerIndices[2] ?? Number.POSITIVE_INFINITY);
 	});
 });
