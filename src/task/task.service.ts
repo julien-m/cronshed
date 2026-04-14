@@ -167,7 +167,11 @@ export class TaskService {
 			task.allowParallel = input.allowParallel;
 		}
 		if (hasTimeout) {
-			task.timeout = input.timeout;
+			if (input.timeout === null) {
+				delete task.timeout;
+			} else {
+				task.timeout = input.timeout;
+			}
 		}
 
 		// @spec FR-005: Apply tag additions and removals — .specs/features/013-task-groups-tags/spec.md#fr-005

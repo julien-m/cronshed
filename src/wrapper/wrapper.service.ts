@@ -1,7 +1,7 @@
 // @spec FR-036: Wrapper generation, FR-037: Wrapper execution logic, FR-039: Directory creation, FR-040: Wrapper removal, FR-041: Wrapper path — .specs/features/005-wrapper-script-generation/spec.md#fr-036
 // @spec FR-086: Flock injection, FR-089: Timeout tool check, FR-090: Timeout wrapping, FR-097: PID in lock, FR-098: Lock hash — .specs/features/015-wrapper-protections/spec.md#fr-086
 
-import { chmod, mkdir, readdir, unlink } from "node:fs/promises";
+import { chmod, mkdir, readdir, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { TimeoutToolMissingError, WrapperGenerationError } from "./wrapper.errors";
 import type { WrapperConfig } from "./wrapper.types";
@@ -215,6 +215,56 @@ export class WrapperService {
 	}
 
 	/**
+	 * Kill a running process for a task by reading its PID from the lock file.
+	 * Kills the entire process tree (all descendants), then cleans up the lock file.
+	 * No-op if lock file does not exist or process is not running.
+	 * @param taskName The task name
+	 * @param configPath Optional config file path (defaults to dataDir/tasks.json)
+	 * @returns true if a process was killed, false otherwise
+	 */
+	async killRunningProcess(taskName: string, configPath?: string): Promise<boolean> {
+		const resolvedConfigPath = configPath ?? join(this.dataDir, "tasks.json");
+		const hash = computeLockHash(resolvedConfigPath, taskName);
+		const locksDir = join(this.dataDir, "locks");
+		const lockFilePath = join(locksDir, `${hash}.lock`);
+
+		let pid: number;
+		try {
+			const content = await readFile(lockFilePath, "utf-8");
+			pid = parseInt(content.trim(), 10);
+		} catch {
+			return false;
+		}
+
+		if (isNaN(pid) || pid <= 0) {
+			try {
+				await unlink(lockFilePath);
+			} catch {}
+			return false;
+		}
+
+		// Check if process is still running
+		try {
+			process.kill(pid, 0);
+		} catch {
+			// Process not running — clean up stale lock file
+			try {
+				await unlink(lockFilePath);
+			} catch {}
+			return false;
+		}
+
+		// Kill entire process tree (descendants first, then root)
+		await killProcessTree(pid);
+
+		// Clean up lock file
+		try {
+			await unlink(lockFilePath);
+		} catch {}
+		return true;
+	}
+
+	/**
 	 * Regenerate all wrappers from tasks and remove orphaned wrappers.
 	 */
 	// @spec FR-044: Sync regenerates wrappers — .specs/features/005-wrapper-script-generation/spec.md#fr-044
@@ -414,6 +464,32 @@ async function detectFirstCommandPath(commands: readonly string[]): Promise<stri
 	}
 
 	return undefined;
+}
+
+/**
+ * Recursively kill a process and all its descendants.
+ * Uses pgrep to find child PIDs, kills bottom-up to avoid orphans.
+ */
+async function killProcessTree(pid: number): Promise<void> {
+	// Find all child PIDs
+	const result = await Bun.$`pgrep -P ${pid}`.quiet().nothrow();
+	if (result.exitCode === 0) {
+		const childPids = result
+			.text()
+			.trim()
+			.split("\n")
+			.filter(Boolean)
+			.map((s) => parseInt(s, 10));
+		// Kill children first (depth-first)
+		for (const childPid of childPids) {
+			await killProcessTree(childPid);
+		}
+	}
+
+	// Kill this process
+	try {
+		process.kill(pid, "SIGTERM");
+	} catch {}
 }
 
 // @spec FR-098: Lock hash computation — .specs/features/015-wrapper-protections/spec.md#fr-098

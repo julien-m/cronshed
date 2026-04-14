@@ -44,7 +44,7 @@ export interface UpdateTaskInput {
 	tags?: string[];
 	untags?: string[];
 	allowParallel?: boolean;
-	timeout?: string;
+	timeout?: string | null;
 }
 
 // @spec FR-055: TASK_STATUS includes paused — .specs/features/009-task-pause-resume/spec.md#fr-055

@@ -2,7 +2,7 @@
 
 import { test, expect, describe, beforeEach, afterEach, beforeAll } from "bun:test";
 import { join } from "node:path";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { WrapperService, computeLockHash } from "./wrapper.service";
 
@@ -291,5 +291,110 @@ describe("Wrapper Protections Integration", () => {
 			expect(entry.exitCode).toBe(0);
 			expect(entry.stdout).toContain("hello");
 		}, 10000);
+	});
+
+	describe("killRunningProcess", () => {
+		test("kills a process launched via wrapper and cleans up lock file", async () => {
+			if (!hasFlockTool) {
+				console.log("Skipping kill test: flock not available");
+				return;
+			}
+
+			const configPath = join(dataDir, "tasks.json");
+			const wrapperPath = await service.generate({
+				name: "long-task",
+				command: "sleep 300",
+				allowParallel: false,
+				configPath,
+			});
+
+			// Spawn the wrapper
+			const proc = Bun.spawn(["bash", wrapperPath], {
+				env: { ...process.env },
+				stdout: "pipe",
+				stderr: "pipe",
+			});
+
+			// Wait for the process to start and write PID to lock file
+			await new Promise((r) => setTimeout(r, 500));
+
+			// Verify the lock file has a PID
+			const hash = computeLockHash(configPath, "long-task");
+			const lockFilePath = join(dataDir, "locks", `${hash}.lock`);
+			const lockContent = await readFile(lockFilePath, "utf-8");
+			const lockPid = parseInt(lockContent.trim(), 10);
+			expect(lockPid).toBeGreaterThan(0);
+
+			// Kill via service
+			const killed = await service.killRunningProcess("long-task", configPath);
+			expect(killed).toBe(true);
+
+			// Wait for process to die
+			await new Promise((r) => setTimeout(r, 200));
+
+			// Verify wrapper process is dead
+			let alive = false;
+			try {
+				process.kill(proc.pid, 0);
+				alive = true;
+			} catch {}
+			expect(alive).toBe(false);
+
+			// Lock file should be cleaned up
+			expect(await Bun.file(lockFilePath).exists()).toBe(false);
+		}, 10000);
+
+		test("kills entire process tree including child processes", async () => {
+			if (!hasFlockTool) {
+				console.log("Skipping kill tree test: flock not available");
+				return;
+			}
+
+			const configPath = join(dataDir, "tasks.json");
+			const wrapperPath = await service.generate({
+				name: "tree-task",
+				command: 'bash -c "sleep 300"',
+				allowParallel: false,
+				configPath,
+			});
+
+			const proc = Bun.spawn(["bash", wrapperPath], {
+				env: { ...process.env },
+				stdout: "pipe",
+				stderr: "pipe",
+			});
+
+			await new Promise((r) => setTimeout(r, 1000));
+
+			// Find child PIDs before kill
+			const pgrepResult = await Bun.$`pgrep -P ${proc.pid}`.quiet().nothrow();
+			const childPids = pgrepResult
+				.text()
+				.trim()
+				.split("\n")
+				.filter(Boolean)
+				.map((s) => parseInt(s, 10));
+			expect(childPids.length).toBeGreaterThan(0);
+
+			const killed = await service.killRunningProcess("tree-task", configPath);
+			expect(killed).toBe(true);
+
+			await new Promise((r) => setTimeout(r, 500));
+
+			// Verify all descendants are dead
+			for (const cpid of childPids) {
+				let alive = false;
+				try {
+					process.kill(cpid, 0);
+					alive = true;
+				} catch {}
+				expect(alive).toBe(false);
+			}
+		}, 10000);
+
+		test("returns false when no process is running (no lock file)", async () => {
+			const result = await service.killRunningProcess("no-such-task");
+			expect(result).toBe(false);
+		});
 	});
 });

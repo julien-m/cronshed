@@ -6,25 +6,27 @@
 // @spec FR-001: Run handler — .specs/features/014-dry-run-mode/spec.md#fr-001
 
 import { parseArgs } from "node:util";
+import { getDataDir, getLogPath } from "../../app/config";
+import { CrontabAdapter } from "../../crontab/crontab.adapter";
+import { SyncService } from "../../crontab/sync.service";
+import { DiagnosisService } from "../../diagnosis/diagnosis.service";
+import type { DiagnosisResult } from "../../diagnosis/diagnosis.types";
+import { importCrontabEntries } from "../../import/import.service";
+import { DEFAULT_MAX_AGE_DAYS, DEFAULT_MAX_ENTRIES, rotateAllLogs, rotateLogFile } from "../../log/rotation.service";
+import type { RotationResult } from "../../log/rotation.service";
 import { TaskRepository } from "../../task/task.repository";
 import { TaskService } from "../../task/task.service";
-import { SyncService } from "../../crontab/sync.service";
-import { CrontabAdapter } from "../../crontab/crontab.adapter";
 import { WrapperService } from "../../wrapper/wrapper.service";
-import { DiagnosisService } from "../../diagnosis/diagnosis.service";
-import { importCrontabEntries } from "../../import/import.service";
-import { rotateLogFile, rotateAllLogs, DEFAULT_MAX_AGE_DAYS, DEFAULT_MAX_ENTRIES } from "../../log/rotation.service";
-import { getDataDir, getLogPath } from "../../app/config";
-import { formatSuccess, formatError } from "../formatters/base.formatter";
+import { formatError, formatSuccess } from "../formatters/base.formatter";
 import {
-	formatSyncResult,
-	formatSyncDiff,
 	formatDiagnosisReport,
 	formatImportPreview,
 	formatImportSummary,
-	formatSkippedWarning,
 	formatRotationSummary,
 	formatRunSummary,
+	formatSkippedWarning,
+	formatSyncDiff,
+	formatSyncResult,
 } from "../formatters/ops.formatter";
 import { autoSync } from "./shared";
 
@@ -78,7 +80,7 @@ export async function handleDoctor(args: string[]): Promise<void> {
 	const diagnosisService = new DiagnosisService(repo, adapter, wrapperService, getDataDir());
 	const taskService = new TaskService(repo);
 
-	let results;
+	let results: DiagnosisResult[];
 	if (name) {
 		// Validate task exists
 		const task = await taskService.get(name);
@@ -193,14 +195,14 @@ export async function handleRotate(args: string[]): Promise<void> {
 	});
 
 	const maxAgeDays = values["max-age"] !== undefined ? parseInt(values["max-age"], 10) : DEFAULT_MAX_AGE_DAYS;
-	if (isNaN(maxAgeDays) || maxAgeDays < 0) {
+	if (Number.isNaN(maxAgeDays) || maxAgeDays < 0) {
 		console.error(formatError("Invalid --max-age value", "Must be a non-negative integer"));
 		process.exit(2);
 		return;
 	}
 
 	const maxEntries = values["max-entries"] !== undefined ? parseInt(values["max-entries"], 10) : DEFAULT_MAX_ENTRIES;
-	if (isNaN(maxEntries) || maxEntries < 0) {
+	if (Number.isNaN(maxEntries) || maxEntries < 0) {
 		console.error(formatError("Invalid --max-entries value", "Must be a non-negative integer"));
 		process.exit(2);
 		return;
@@ -215,7 +217,7 @@ export async function handleRotate(args: string[]): Promise<void> {
 	const repo = new TaskRepository();
 	const taskService = new TaskService(repo);
 
-	let results;
+	let results: Array<RotationResult>;
 	if (name) {
 		// Validate task exists
 		const task = await taskService.get(name);
@@ -284,11 +286,17 @@ export async function handleRun(args: string[]): Promise<void> {
 
 	// Output summary
 	if (values.json) {
-		console.log(JSON.stringify({
-			taskName: task.name,
-			exitCode,
-			durationMs,
-		}, null, "\t"));
+		console.log(
+			JSON.stringify(
+				{
+					taskName: task.name,
+					exitCode,
+					durationMs,
+				},
+				null,
+				"\t",
+			),
+		);
 	} else {
 		console.log(formatRunSummary(task.name, exitCode, durationMs));
 	}

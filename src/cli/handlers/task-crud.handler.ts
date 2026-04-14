@@ -2,19 +2,18 @@
 // @spec FR-029, FR-030, FR-031, FR-032, FR-033, FR-034: Mutation auto-sync — .specs/features/004-auto-sync/spec.md#fr-029
 // @spec FR-088: Protection flags on add/update — .specs/features/015-wrapper-protections/spec.md#fr-088
 
-import { parseArgs } from "node:util";
-import { TaskService } from "../../task/task.service";
-import { TaskRepository } from "../../task/task.repository";
-import { WrapperService } from "../../wrapper/wrapper.service";
-import { resolveCommand } from "../command.resolver";
 import { getDataDir, getTasksPath } from "../../app/config";
-import { formatSuccess, formatError, formatWarning } from "../formatters/base.formatter";
-import { autoSync } from "./shared";
-import { parseDuration } from "../../wrapper/duration";
-import { scheduleToIntervalSeconds } from "../../cron/schedule-interval";
 import { ConfigRepository } from "../../config/config.repository";
 import { ConfigService } from "../../config/config.service";
-import { detectTimeoutTool } from "../../wrapper/wrapper.service";
+import { scheduleToIntervalSeconds } from "../../cron/schedule-interval";
+import type { TaskRepository } from "../../task/task.repository";
+import type { TaskService } from "../../task/task.service";
+import { parseDuration } from "../../wrapper/duration";
+import { detectTimeoutTool, WrapperService } from "../../wrapper/wrapper.service";
+import { parseArgs } from "node:util";
+import { resolveCommand } from "../command.resolver";
+import { formatError, formatSuccess, formatWarning } from "../formatters/base.formatter";
+import { autoSync } from "./shared";
 
 // @spec FR-094: Compute timeout from ratio — .specs/features/015-wrapper-protections/spec.md#fr-094
 /** Minimum auto-computed timeout in seconds. */
@@ -71,6 +70,8 @@ export async function handleAdd(args: string[], service: TaskService, repo: Task
 		console.error(formatError("Missing --command flag", "Usage: cronshed add <name> --schedule '<cron>' --command '<cmd>'"));
 		process.exit(2);
 	}
+	const schedule = values.schedule;
+	const command = values.command;
 
 	// Validate timeout format if provided
 	if (values.timeout) {
@@ -78,7 +79,7 @@ export async function handleAdd(args: string[], service: TaskService, repo: Task
 	}
 
 	// @spec FR-016: Include resolved path in success message — .specs/features/002-command-path-resolution/spec.md#fr-016
-	const resolution = await resolveCommand(values.command!);
+	const resolution = await resolveCommand(command);
 
 	// Determine effective timeout
 	let effectiveTimeout = values.timeout;
@@ -88,7 +89,7 @@ export async function handleAdd(args: string[], service: TaskService, repo: Task
 		effectiveTimeoutSeconds = parseDuration(values.timeout);
 	} else {
 		// @spec FR-094: Auto-compute timeout from ratio — .specs/features/015-wrapper-protections/spec.md#fr-094
-		effectiveTimeoutSeconds = await computeTimeoutFromRatio(values.schedule!);
+		effectiveTimeoutSeconds = await computeTimeoutFromRatio(schedule);
 		if (effectiveTimeoutSeconds !== undefined) {
 			effectiveTimeout = `${effectiveTimeoutSeconds}s`;
 		}
@@ -101,7 +102,7 @@ export async function handleAdd(args: string[], service: TaskService, repo: Task
 
 	// @spec FR-096: Short-schedule warning — .specs/features/015-wrapper-protections/spec.md#fr-096
 	if (!effectiveTimeout) {
-		const intervalSeconds = scheduleToIntervalSeconds(values.schedule!);
+		const intervalSeconds = scheduleToIntervalSeconds(schedule);
 		if (intervalSeconds !== null && intervalSeconds <= 60) {
 			console.error(formatWarning("Schedule runs every minute. Consider adding --timeout to prevent overlap."));
 		}
@@ -110,7 +111,7 @@ export async function handleAdd(args: string[], service: TaskService, repo: Task
 	// @spec FR-051: Pass notify flag to task creation — .specs/features/008-failure-notifications/spec.md#fr-051
 	const task = await service.add({
 		name,
-		schedule: values.schedule!,
+		schedule,
 		command: resolution.resolved,
 		notify: values.notify ?? false,
 		tags: values.tag,
@@ -162,6 +163,7 @@ export async function handleUpdate(args: string[], service: TaskService, repo: T
 			"allow-parallel": { type: "boolean" },
 			"no-allow-parallel": { type: "boolean" },
 			timeout: { type: "string" },
+			"no-timeout": { type: "boolean" },
 		},
 		allowPositionals: false,
 	});
@@ -184,8 +186,11 @@ export async function handleUpdate(args: string[], service: TaskService, repo: T
 	// Resolve allowParallel: --allow-parallel wins over --no-allow-parallel
 	const allowParallelValue = values["allow-parallel"] === true ? true : values["no-allow-parallel"] === true ? false : undefined;
 
+	// Resolve timeout: --timeout <value> sets it, --no-timeout clears it, undefined if neither
+	const timeoutValue: string | null | undefined = values.timeout ? values.timeout : values["no-timeout"] === true ? null : undefined;
+
 	// @spec FR-089: Check timeout tool availability on update — .specs/features/015-wrapper-protections/spec.md#fr-089
-	if (values.timeout) {
+	if (timeoutValue && timeoutValue !== null) {
 		await detectTimeoutTool();
 	}
 
@@ -196,11 +201,11 @@ export async function handleUpdate(args: string[], service: TaskService, repo: T
 		tags: values.tag,
 		untags: values.untag,
 		allowParallel: allowParallelValue,
-		timeout: values.timeout,
+		timeout: timeoutValue,
 	});
 
 	// @spec FR-042: Regenerate wrapper on command, notify, or protection change — .specs/features/005-wrapper-script-generation/spec.md#fr-042
-	const shouldRegenerate = values.command || notifyValue !== undefined || allowParallelValue !== undefined || values.timeout !== undefined;
+	const shouldRegenerate = values.command || notifyValue !== undefined || allowParallelValue !== undefined || timeoutValue !== undefined;
 	if (shouldRegenerate) {
 		const wrapperService = new WrapperService(getDataDir());
 		await wrapperService.generate({
@@ -235,8 +240,14 @@ export async function handleRemove(args: string[], service: TaskService, repo: T
 
 	await service.remove(name);
 
-	// @spec FR-043: Delete wrapper on remove — .specs/features/005-wrapper-script-generation/spec.md#fr-043
+	// Kill any running process for this task before removing the wrapper
 	const wrapperService = new WrapperService(getDataDir());
+	const killed = await wrapperService.killRunningProcess(name);
+	if (killed) {
+		console.log(formatWarning(`Killed running process for task ${name}`));
+	}
+
+	// @spec FR-043: Delete wrapper on remove — .specs/features/005-wrapper-script-generation/spec.md#fr-043
 	await wrapperService.remove(name);
 
 	console.log(formatSuccess(`Task ${name} removed`));
