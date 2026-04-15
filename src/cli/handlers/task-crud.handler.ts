@@ -193,12 +193,19 @@ export async function handleUpdate(args: string[], service: TaskService, repo: T
 	const allowParallelValue =
 		values["allow-parallel"] === true ? true : values["no-allow-parallel"] === true ? false : undefined;
 
-	// Resolve timeout: --timeout <value> sets it, --no-timeout clears it, undefined if neither
-	const timeoutValue: string | null | undefined = values.timeout
-		? values.timeout
-		: values["no-timeout"] === true
-			? null
-			: undefined;
+	// Resolve timeout: --timeout <value> sets it, --no-timeout falls back to ratio (or clears), undefined if neither
+	let timeoutValue: string | null | undefined;
+	if (values.timeout) {
+		timeoutValue = values.timeout;
+	} else if (values["no-timeout"] === true) {
+		// Fall back to ratio-based timeout if a default-timeout-ratio is configured
+		const existingTask = await service.get(name);
+		const effectiveSchedule = values.schedule ?? existingTask.schedule;
+		const ratioSeconds = await computeTimeoutFromRatio(effectiveSchedule);
+		timeoutValue = ratioSeconds !== undefined ? `${ratioSeconds}s` : null;
+	} else {
+		timeoutValue = undefined;
+	}
 
 	// @spec FR-089: Check timeout tool availability on update — .specs/features/015-wrapper-protections/spec.md#fr-089
 	if (timeoutValue && timeoutValue !== null) {

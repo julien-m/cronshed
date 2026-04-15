@@ -1076,6 +1076,36 @@ describe("cronshed update --allow-parallel", () => {
 	});
 });
 
+// @spec FR-094: --no-timeout falls back to ratio — .specs/features/015-wrapper-protections/spec.md#fr-094
+describe("cronshed update --no-timeout", () => {
+	test("AC-094a: --no-timeout with ratio configured applies computed timeout to wrapper", async () => {
+		// Set default-timeout-ratio = 0.8 in config
+		await Bun.write(join(tmpDir, "config.json"), JSON.stringify({ defaultTimeoutRatio: 0.8 }));
+
+		// Add task with explicit timeout, then remove it with --no-timeout
+		await run("add", "sync-task", "--schedule", "* * * * *", "--command", "echo hi", "--timeout", "30s", "--no-sync");
+		const { stdout, exitCode } = await run("update", "sync-task", "--no-timeout", "--no-sync");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("Task sync-task updated");
+
+		// Wrapper should use ratio-computed timeout: floor(60 * 0.8) = 48s
+		const wrapper = await Bun.file(join(tmpDir, "wrappers", "sync-task.sh")).text();
+		expect(wrapper).toContain("CRONSHED_TIMEOUT_SECS=48");
+	});
+
+	test("AC-094b: --no-timeout without ratio configured disables timeout", async () => {
+		// No config.json — no ratio
+		await run("add", "sync-task", "--schedule", "* * * * *", "--command", "echo hi", "--timeout", "30s", "--no-sync");
+		const { stdout, exitCode } = await run("update", "sync-task", "--no-timeout", "--no-sync");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("Task sync-task updated");
+
+		// Wrapper should have no timeout
+		const wrapper = await Bun.file(join(tmpDir, "wrappers", "sync-task.sh")).text();
+		expect(wrapper).toContain("CRONSHED_TIMEOUT_SECS=0");
+	});
+});
+
 // @spec FR-096: Short-schedule warning — .specs/features/015-wrapper-protections/spec.md#fr-096
 describe("cronshed add — short schedule warning", () => {
 	test("AC-083: short-schedule warning printed to stderr when schedule <= 60s, no --timeout, no ratio", async () => {
