@@ -3,7 +3,7 @@
 	"module": "index.ts",
 	"devDependencies": {
 		"@types/bun": "latest",
-		"typescript": "^5"
+		"typescript": "^6"
 	},
 	"bin": {
 		"shed": "index.ts"
