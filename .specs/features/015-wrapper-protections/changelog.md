@@ -1,5 +1,15 @@
 # Changelog — 015-wrapper-protections
 
+## 2026-07-06 — Bugfix: P1 wrapper protection review fixes
+
+- **Type:** Bugfix
+- **Spec modified:** No (FR-086/FR-094 existing behavior restored)
+- **Code modified:** Read [`src/wrapper/wrapper.service.ts`](../../../src/wrapper/wrapper.service.ts), [`src/cli/handlers/task-crud.handler.ts`](../../../src/cli/handlers/task-crud.handler.ts), [`src/crontab/sync.service.ts`](../../../src/crontab/sync.service.ts), [`src/diagnosis/diagnosis.service.ts`](../../../src/diagnosis/diagnosis.service.ts)
+- **Tests modified:** Read [`src/wrapper/wrapper.service.test.ts`](../../../src/wrapper/wrapper.service.test.ts), [`src/cli/cli.integration.test.ts`](../../../src/cli/cli.integration.test.ts)
+- **AC impacted:** AC-075, AC-086, AC-087, AC-092
+- **Changes:** stale PID lock files are cleaned without kill when flock is free; ratio-derived timeouts are computed during wrapper generation and follow schedule updates without being persisted
+- **Author:** codex
+
 ## 2026-04-13 — Initial Implementation
 
 ### Added

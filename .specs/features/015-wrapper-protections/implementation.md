@@ -18,7 +18,7 @@
 | FR-091 | timedOut field in log entry | src/wrapper/wrapper.service.ts (TIMEOUT_LOG_PRINTF) | @spec FR-091 |
 | FR-092 | ConfigService get/set with validation | src/config/config.service.ts, src/config/config.repository.ts | @spec FR-092 |
 | FR-093 | Config CLI commands | src/cli/handlers/config.handler.ts, src/cli/cli.handler.ts | @spec FR-093 |
-| FR-094 | Auto-compute timeout from ratio | src/cli/handlers/task-crud.handler.ts (computeTimeoutFromRatio) | @spec FR-094 |
+| FR-094 | Auto-compute timeout from ratio | Read [`src/wrapper/wrapper.service.ts`](../../../src/wrapper/wrapper.service.ts) (`WrapperService.generate()`, `computeTimeoutFromRatio`), [`src/cli/handlers/task-crud.handler.ts`](../../../src/cli/handlers/task-crud.handler.ts) (explicit timeout only), [`src/crontab/sync.service.ts`](../../../src/crontab/sync.service.ts) (passes schedule) | @spec FR-094 |
 | FR-095 | Schedule interval calculation | src/cron/schedule-interval.ts | @spec FR-095 |
 | FR-096 | Short-schedule warning | src/cli/handlers/task-crud.handler.ts | @spec FR-096 |
 | FR-097 | PID written to lock file | src/wrapper/wrapper.service.ts (echo $$ > lock) | @spec FR-097 |
@@ -40,7 +40,7 @@
 | AC-083 | Short-schedule warning to stderr | handleAdd checks interval <= 60s |
 | AC-084 | config set validates 0 < ratio <= 1 | ConfigService.set() validation |
 | AC-085 | Invalid ratio rejected | ConfigService.set() throws InvalidConfigValueError |
-| AC-086 | Auto-timeout from ratio (min 10s) | computeTimeoutFromRatio() in task-crud.handler.ts |
+| AC-086 | Auto-timeout from ratio (min 10s) | WrapperService computes from current schedule during wrapper generation; derived values are not persisted |
 | AC-087 | Explicit --timeout overrides ratio | handleAdd checks explicit timeout first |
 | AC-088 | config get prints value or "not set" | handleConfigGet in config.handler.ts |
 | AC-089 | Lock hash is sha256(configPath:taskName) | computeLockHash() |
@@ -70,16 +70,16 @@
 | src/task/task.types.ts | Added allowParallel?, timeout? to Task, CreateTaskInput, UpdateTaskInput |
 | src/wrapper/wrapper.types.ts | Added allowParallel, timeout?, lockFilePath?, locksDir? to WrapperConfig |
 | src/wrapper/wrapper.errors.ts | Added TimeoutToolMissingError |
-| src/wrapper/wrapper.service.ts | Flock block, timeout wrapping, timedOut, detectTimeoutTool, computeLockHash |
+| Read [`src/wrapper/wrapper.service.ts`](../../../src/wrapper/wrapper.service.ts) | Flock block, stale-lock safety before kill, timeout wrapping, timedOut, detectTimeoutTool, ratio timeout calculation, computeLockHash |
 | src/wrapper/wrapper.service.test.ts | Tests for flock, timeout, lock hash, combined |
 | src/cli/cli.handler.ts | Registered config command, TimeoutToolMissingError exit code, help text |
-| src/cli/handlers/task-crud.handler.ts | --allow-parallel, --timeout flags, ratio auto-compute, short-schedule warning |
+| Read [`src/cli/handlers/task-crud.handler.ts`](../../../src/cli/handlers/task-crud.handler.ts) | --allow-parallel, --timeout flags, explicit timeout persistence, dynamic ratio wrapper regeneration, short-schedule warning |
 | src/task/task.service.ts | Store and update allowParallel and timeout fields |
 | src/task/task.repository.ts | Backward compat comment for new fields |
 | src/log/log.types.ts | Added skip/timeout fields to ExecutionLogEntry |
 | src/cli/formatters/task.formatter.ts | Display Parallel/Timeout in details, NOTE column in history |
-| src/crontab/sync.service.ts | Pass protection fields and configPath to syncWrappers |
-| src/diagnosis/diagnosis.service.ts | Pass lock/timeout info to buildScript for comparison |
+| Read [`src/crontab/sync.service.ts`](../../../src/crontab/sync.service.ts) | Pass protection fields, schedule, and configPath to syncWrappers |
+| Read [`src/diagnosis/diagnosis.service.ts`](../../../src/diagnosis/diagnosis.service.ts) | Pass lock/timeout info, including dynamic ratio timeout, to buildScript for comparison |
 
 ## Design Decisions
 
@@ -90,3 +90,7 @@
 3. **Lock hash uses Bun.CryptoHasher** — No shell dependency for hashing. The SHA-256 hash is computed in TypeScript and baked into the wrapper as a literal string.
 
 4. **Config validation: 0 < ratio <= 1** — Zero is rejected (would produce 0-second timeout), 1.0 is valid (use full interval).
+
+5. **Ratio timeout is derived, not persisted** — `default-timeout-ratio` is applied when generating wrappers and no explicit task timeout exists. Schedule updates regenerate the wrapper so the derived value follows the current cron interval.
+
+6. **PID kill requires held flock** — `killRunningProcess()` treats an acquireable lock as stale and removes the lock file without signaling the PID, preventing reused PID termination.

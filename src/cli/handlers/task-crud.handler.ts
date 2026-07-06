@@ -10,31 +10,22 @@ import { scheduleToIntervalSeconds } from "../../cron/schedule-interval";
 import type { TaskRepository } from "../../task/task.repository";
 import type { TaskService } from "../../task/task.service";
 import { parseDuration } from "../../wrapper/duration";
-import { detectTimeoutTool, WrapperService } from "../../wrapper/wrapper.service";
+import { computeTimeoutFromRatio, detectTimeoutTool, WrapperService } from "../../wrapper/wrapper.service";
 import { resolveCommand } from "../command.resolver";
 import { formatError, formatSuccess, formatWarning } from "../formatters/base.formatter";
 import { autoSync } from "./shared";
 
-// @spec FR-094: Compute timeout from ratio — .specs/features/015-wrapper-protections/spec.md#fr-094
-/** Minimum auto-computed timeout in seconds. */
-const MIN_AUTO_TIMEOUT_SECONDS = 10;
-
-/**
- * If explicit timeout is not set, compute timeout from default-timeout-ratio config.
- * Returns the timeout seconds or undefined if no ratio is configured.
- */
-async function computeTimeoutFromRatio(schedule: string): Promise<number | undefined> {
+/** Whether a ratio is configured, without computing or persisting a derived timeout. */
+async function hasDefaultTimeoutRatio(): Promise<boolean> {
 	const configRepo = new ConfigRepository();
 	const configService = new ConfigService(configRepo);
 	const ratioStr = await configService.get("default-timeout-ratio");
-	if (!ratioStr) return undefined;
+	return ratioStr !== undefined;
+}
 
-	const ratio = parseFloat(ratioStr);
-	const intervalSeconds = scheduleToIntervalSeconds(schedule);
-	if (intervalSeconds === null) return undefined;
-
-	const computed = Math.floor(intervalSeconds * ratio);
-	return Math.max(computed, MIN_AUTO_TIMEOUT_SECONDS);
+async function computeConfiguredRatioTimeout(schedule: string): Promise<number | undefined> {
+	const configRepo = new ConfigRepository();
+	return computeTimeoutFromRatio(schedule, configRepo.getPath());
 }
 
 // @spec FR-029, FR-034: Auto-sync on add with --no-sync flag — .specs/features/004-auto-sync/spec.md#fr-029
@@ -85,27 +76,17 @@ export async function handleAdd(args: string[], service: TaskService, repo: Task
 	// @spec FR-016: Include resolved path in success message — .specs/features/002-command-path-resolution/spec.md#fr-016
 	const resolution = await resolveCommand(command);
 
-	// Determine effective timeout
-	let effectiveTimeout = values.timeout;
-	let effectiveTimeoutSeconds: number | undefined;
-
 	if (values.timeout) {
-		effectiveTimeoutSeconds = parseDuration(values.timeout);
-	} else {
-		// @spec FR-094: Auto-compute timeout from ratio — .specs/features/015-wrapper-protections/spec.md#fr-094
-		effectiveTimeoutSeconds = await computeTimeoutFromRatio(schedule);
-		if (effectiveTimeoutSeconds !== undefined) {
-			effectiveTimeout = `${effectiveTimeoutSeconds}s`;
-		}
+		parseDuration(values.timeout);
 	}
 
-	// @spec FR-089: Check timeout tool availability — .specs/features/015-wrapper-protections/spec.md#fr-089
-	if (effectiveTimeout) {
-		await detectTimeoutTool(); // throws TimeoutToolMissingError if not found
+	const ratioTimeoutSeconds = values.timeout ? undefined : await computeConfiguredRatioTimeout(schedule);
+	if (values.timeout || ratioTimeoutSeconds !== undefined) {
+		await detectTimeoutTool();
 	}
 
 	// @spec FR-096: Short-schedule warning — .specs/features/015-wrapper-protections/spec.md#fr-096
-	if (!effectiveTimeout) {
+	if (!values.timeout && !(await hasDefaultTimeoutRatio())) {
 		const intervalSeconds = scheduleToIntervalSeconds(schedule);
 		if (intervalSeconds !== null && intervalSeconds <= 60) {
 			console.error(formatWarning("Schedule runs every minute. Consider adding --timeout to prevent overlap."));
@@ -120,7 +101,7 @@ export async function handleAdd(args: string[], service: TaskService, repo: Task
 		notify: values.notify ?? false,
 		tags: values.tag,
 		allowParallel: values["allow-parallel"] ?? false,
-		timeout: effectiveTimeout,
+		timeout: values.timeout,
 	});
 
 	// @spec FR-042: Generate wrapper on add — .specs/features/005-wrapper-script-generation/spec.md#fr-042
@@ -193,22 +174,27 @@ export async function handleUpdate(args: string[], service: TaskService, repo: T
 	const allowParallelValue =
 		values["allow-parallel"] === true ? true : values["no-allow-parallel"] === true ? false : undefined;
 
-	// Resolve timeout: --timeout <value> sets it, --no-timeout falls back to ratio (or clears), undefined if neither
+	// Resolve timeout: --timeout <value> sets explicit timeout; --no-timeout clears it.
 	let timeoutValue: string | null | undefined;
 	if (values.timeout) {
 		timeoutValue = values.timeout;
 	} else if (values["no-timeout"] === true) {
-		// Fall back to ratio-based timeout if a default-timeout-ratio is configured
-		const existingTask = await service.get(name);
-		const effectiveSchedule = values.schedule ?? existingTask.schedule;
-		const ratioSeconds = await computeTimeoutFromRatio(effectiveSchedule);
-		timeoutValue = ratioSeconds !== undefined ? `${ratioSeconds}s` : null;
+		timeoutValue = null;
 	} else {
 		timeoutValue = undefined;
 	}
 
-	// @spec FR-089: Check timeout tool availability on update — .specs/features/015-wrapper-protections/spec.md#fr-089
-	if (timeoutValue && timeoutValue !== null) {
+	let requiresTimeoutTool = values.timeout !== undefined;
+	if (!requiresTimeoutTool && (values.schedule || values["no-timeout"] === true)) {
+		const existingTask = await service.get(name);
+		if (values["no-timeout"] !== true && existingTask.timeout) {
+			requiresTimeoutTool = true;
+		} else {
+			const effectiveSchedule = values.schedule ?? existingTask.schedule;
+			requiresTimeoutTool = (await computeConfiguredRatioTimeout(effectiveSchedule)) !== undefined;
+		}
+	}
+	if (requiresTimeoutTool) {
 		await detectTimeoutTool();
 	}
 
@@ -224,11 +210,16 @@ export async function handleUpdate(args: string[], service: TaskService, repo: T
 
 	// @spec FR-042: Regenerate wrapper on command, notify, or protection change — .specs/features/005-wrapper-script-generation/spec.md#fr-042
 	const shouldRegenerate =
-		values.command || notifyValue !== undefined || allowParallelValue !== undefined || timeoutValue !== undefined;
+		values.schedule ||
+		values.command ||
+		notifyValue !== undefined ||
+		allowParallelValue !== undefined ||
+		timeoutValue !== undefined;
 	if (shouldRegenerate) {
 		const wrapperService = new WrapperService(getDataDir());
 		await wrapperService.generate({
 			...task,
+			schedule: task.schedule,
 			configPath: getTasksPath(),
 		});
 	}

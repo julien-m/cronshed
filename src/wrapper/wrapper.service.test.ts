@@ -563,6 +563,19 @@ describe("WrapperService", () => {
 			expect(result).toBe(false);
 		});
 
+		test("returns false and cleans up stale lock file when PID is alive but flock is free", async () => {
+			const locksDir = join(dataDir, "locks");
+			await mkdir(locksDir, { recursive: true });
+			const hash = computeLockHash(join(dataDir, "tasks.json"), "stale-live-pid-task");
+			const lockFile = join(locksDir, `${hash}.lock`);
+			await writeFile(lockFile, `${process.pid}\n`);
+
+			const result = await service.killRunningProcess("stale-live-pid-task");
+			expect(result).toBe(false);
+			expect(await Bun.file(lockFile).exists()).toBe(false);
+			expect(() => process.kill(process.pid, 0)).not.toThrow();
+		});
+
 		test("returns false and cleans up lock file with invalid PID", async () => {
 			const locksDir = join(dataDir, "locks");
 			await mkdir(locksDir, { recursive: true });
@@ -585,35 +598,6 @@ describe("WrapperService", () => {
 
 			const result = await service.killRunningProcess("stale-task");
 			expect(result).toBe(false);
-			expect(await Bun.file(lockFile).exists()).toBe(false);
-		});
-
-		test("kills a running process and returns true", async () => {
-			// Spawn a long-running process
-			const proc = Bun.spawn(["sleep", "300"], { stdout: "ignore", stderr: "ignore" });
-			const pid = proc.pid;
-
-			const locksDir = join(dataDir, "locks");
-			await mkdir(locksDir, { recursive: true });
-			const hash = computeLockHash(join(dataDir, "tasks.json"), "running-task");
-			const lockFile = join(locksDir, `${hash}.lock`);
-			await writeFile(lockFile, `${pid}\n`);
-
-			const result = await service.killRunningProcess("running-task");
-			expect(result).toBe(true);
-
-			// Wait briefly for the process to die
-			await new Promise((r) => setTimeout(r, 100));
-
-			// Verify process is dead
-			let alive = false;
-			try {
-				process.kill(pid, 0);
-				alive = true;
-			} catch {}
-			expect(alive).toBe(false);
-
-			// Lock file should be cleaned up
 			expect(await Bun.file(lockFile).exists()).toBe(false);
 		});
 	});

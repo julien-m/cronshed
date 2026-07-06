@@ -105,6 +105,7 @@ export class SyncService {
 		if (this.wrapperService && !options.dryRun) {
 			const tasksWithConfig = tasks.map((t) => ({
 				name: t.name,
+				schedule: t.schedule,
 				command: t.command,
 				notify: t.notify,
 				allowParallel: t.allowParallel,

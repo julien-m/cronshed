@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-07-06 — Bugfix: Wrapper Protections P1 review fixes
+
+- **Type:** Bugfix
+- **Feature:** [015-wrapper-protections](features/015-wrapper-protections/implementation.md)
+- **Files changed:** Read [`src/wrapper/wrapper.service.ts`](../src/wrapper/wrapper.service.ts), [`src/cli/handlers/task-crud.handler.ts`](../src/cli/handlers/task-crud.handler.ts), [`src/crontab/sync.service.ts`](../src/crontab/sync.service.ts), [`src/diagnosis/diagnosis.service.ts`](../src/diagnosis/diagnosis.service.ts), targeted tests
+- **Key fixes:** stale PID safety requires held flock before kill; ratio-derived timeouts are computed at wrapper generation from the current schedule and not persisted
+- **Author:** codex
+
+---
+
 ## 2026-04-13 — Feature: Wrapper Protections implemented
 
 - **Type:** Feature Implemented

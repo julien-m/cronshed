@@ -13,7 +13,7 @@ import type { Task } from "../task/task.types";
 import { TASK_STATUS } from "../task/task.types";
 import { parseDuration } from "../wrapper/duration";
 import type { WrapperService } from "../wrapper/wrapper.service";
-import { computeLockHash } from "../wrapper/wrapper.service";
+import { computeLockHash, computeTimeoutFromRatio } from "../wrapper/wrapper.service";
 import type { WrapperTimeoutConfig } from "../wrapper/wrapper.types";
 import { MAX_OUTPUT_BYTES } from "../wrapper/wrapper.types";
 import type { DiagnosisIssue, DiagnosisResult } from "./diagnosis.types";
@@ -212,6 +212,12 @@ export class DiagnosisService {
 				}
 			} catch {
 				// If duration is invalid, skip timeout comparison
+			}
+		} else {
+			const seconds = await computeTimeoutFromRatio(task.schedule, join(this.dataDir, "config.json"));
+			const toolMatch = onDiskContent.match(/CRONSHED_TIMEOUT_CMD="([^"]+)"/);
+			if (seconds !== undefined && toolMatch) {
+				timeoutConfig = { seconds, tool: toolMatch[1] ?? "" };
 			}
 		}
 

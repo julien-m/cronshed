@@ -1091,6 +1091,10 @@ describe("cronshed update --no-timeout", () => {
 		// Wrapper should use ratio-computed timeout: floor(60 * 0.8) = 48s
 		const wrapper = await Bun.file(join(tmpDir, "wrappers", "sync-task.sh")).text();
 		expect(wrapper).toContain("CRONSHED_TIMEOUT_SECS=48");
+
+		const { stdout: details } = await run("get", "sync-task", "--json");
+		const task = JSON.parse(details);
+		expect(task.timeout).toBeUndefined();
 	});
 
 	test("AC-094b: --no-timeout without ratio configured disables timeout", async () => {
@@ -1103,6 +1107,30 @@ describe("cronshed update --no-timeout", () => {
 		// Wrapper should have no timeout
 		const wrapper = await Bun.file(join(tmpDir, "wrappers", "sync-task.sh")).text();
 		expect(wrapper).toContain("CRONSHED_TIMEOUT_SECS=0");
+	});
+
+	test("AC-086: ratio timeout follows schedule changes without persisting derived timeout", async () => {
+		await Bun.write(join(tmpDir, "config.json"), JSON.stringify({ defaultTimeoutRatio: 0.8 }));
+
+		await run("add", "dynamic-task", "--schedule", "* * * * *", "--command", "echo hi", "--no-sync");
+		const wrapperBefore = await Bun.file(join(tmpDir, "wrappers", "dynamic-task.sh")).text();
+		expect(wrapperBefore).toContain("CRONSHED_TIMEOUT_SECS=48");
+
+		const { stdout: addDetails } = await run("get", "dynamic-task", "--json");
+		const addedTask = JSON.parse(addDetails);
+		expect(addedTask.timeout).toBeUndefined();
+
+		const { stdout, exitCode } = await run("update", "dynamic-task", "--schedule", "*/5 * * * *", "--no-sync");
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain("Task dynamic-task updated");
+
+		const wrapperAfter = await Bun.file(join(tmpDir, "wrappers", "dynamic-task.sh")).text();
+		expect(wrapperAfter).toContain("CRONSHED_TIMEOUT_SECS=240");
+		expect(wrapperAfter).not.toContain("CRONSHED_TIMEOUT_SECS=48");
+
+		const { stdout: updateDetails } = await run("get", "dynamic-task", "--json");
+		const updatedTask = JSON.parse(updateDetails);
+		expect(updatedTask.timeout).toBeUndefined();
 	});
 });
 

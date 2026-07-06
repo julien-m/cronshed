@@ -3,9 +3,15 @@
 
 import { chmod, mkdir, readdir, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
+import { ConfigRepository } from "../config/config.repository";
+import { ConfigService } from "../config/config.service";
+import { scheduleToIntervalSeconds } from "../cron/schedule-interval";
 import { TimeoutToolMissingError, WrapperGenerationError } from "./wrapper.errors";
 import type { WrapperConfig } from "./wrapper.types";
 import { MAX_OUTPUT_BYTES, NOTIFY_STDERR_MAX_CHARS } from "./wrapper.types";
+
+/** Minimum auto-computed timeout in seconds. */
+export const MIN_AUTO_TIMEOUT_SECONDS = 10;
 
 /**
  * Static bash body for wrapper scripts.
@@ -142,6 +148,7 @@ export class WrapperService {
 	// @spec FR-086: Flock injection, FR-098: Lock hash — .specs/features/015-wrapper-protections/spec.md#fr-086
 	async generate(task: {
 		name: string;
+		schedule?: string;
 		command: string;
 		notify?: boolean;
 		allowParallel?: boolean;
@@ -158,6 +165,12 @@ export class WrapperService {
 			const seconds = parseDuration(task.timeout);
 			const tool = await detectTimeoutPath();
 			timeoutConfig = { seconds, tool };
+		} else if (task.schedule) {
+			const seconds = await computeTimeoutFromRatio(task.schedule, join(this.dataDir, "config.json"));
+			if (seconds !== undefined) {
+				const tool = await detectTimeoutPath();
+				timeoutConfig = { seconds, tool };
+			}
 		}
 
 		// Compute lock hash if single-instance is enabled
@@ -236,6 +249,16 @@ export class WrapperService {
 			return false;
 		}
 
+		const lockState = await getLockState(lockFilePath);
+		if (lockState !== "held") {
+			// Stale lock file: no wrapper currently owns the flock, so the PID may belong to
+			// an unrelated process. Clean the file without signaling anything.
+			try {
+				await unlink(lockFilePath);
+			} catch {}
+			return false;
+		}
+
 		if (Number.isNaN(pid) || pid <= 0) {
 			try {
 				await unlink(lockFilePath);
@@ -272,6 +295,7 @@ export class WrapperService {
 	async syncWrappers(
 		tasks: {
 			name: string;
+			schedule?: string;
 			command: string;
 			notify?: boolean;
 			allowParallel?: boolean;
@@ -455,6 +479,20 @@ export async function detectTimeoutPath(): Promise<string> {
 	throw new TimeoutToolMissingError();
 }
 
+// @spec FR-094: Compute timeout from ratio — .specs/features/015-wrapper-protections/spec.md#fr-094
+export async function computeTimeoutFromRatio(schedule: string, configPath: string): Promise<number | undefined> {
+	const configService = new ConfigService(new ConfigRepository(configPath));
+	const ratioStr = await configService.get("default-timeout-ratio");
+	if (!ratioStr) return undefined;
+
+	const ratio = parseFloat(ratioStr);
+	const intervalSeconds = scheduleToIntervalSeconds(schedule);
+	if (intervalSeconds === null) return undefined;
+
+	const computed = Math.floor(intervalSeconds * ratio);
+	return Math.max(computed, MIN_AUTO_TIMEOUT_SECONDS);
+}
+
 async function detectFirstCommandPath(commands: readonly string[]): Promise<string | undefined> {
 	for (const command of commands) {
 		const result = await Bun.$`which ${command}`.quiet().nothrow();
@@ -464,6 +502,19 @@ async function detectFirstCommandPath(commands: readonly string[]): Promise<stri
 	}
 
 	return undefined;
+}
+
+type LockState = "free" | "held" | "unknown";
+
+// @spec FR-086: Flock safety before kill — .specs/features/015-wrapper-protections/spec.md#fr-086
+async function getLockState(lockFilePath: string): Promise<LockState> {
+	const flockPath = await detectFlockPath();
+	if (!flockPath) return "unknown";
+
+	const result = await Bun.$`${flockPath} -n -E 75 ${lockFilePath} -c true`.quiet().nothrow();
+	if (result.exitCode === 0) return "free";
+	if (result.exitCode === 75) return "held";
+	return "unknown";
 }
 
 /**
