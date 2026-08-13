@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-08-13 — Bugfix: cron-parser v5 compatibility
+
+- **Type:** Bugfix
+- **Spec modified:** No
+- **Code modified:** Updated [`src/cron/cron.service.ts`](../src/cron/cron.service.ts), [`src/cron/schedule-interval.ts`](../src/cron/schedule-interval.ts), and [`src/diagnosis/diagnosis.service.ts`](../src/diagnosis/diagnosis.service.ts) to use `CronExpressionParser.parse()`.
+- **Features verified:** [001-task-manifest](features/001-task-manifest/implementation.md), [006-task-listing-status](features/006-task-listing-status/implementation.md), [010-task-diagnosis](features/010-task-diagnosis/implementation.md), [015-wrapper-protections](features/015-wrapper-protections/implementation.md)
+- **Author:** Codex CI Guardian
+
+---
+
 ## 2026-04-13 — Feature: Wrapper Protections implemented
 
 - **Type:** Feature Implemented

@@ -1,6 +1,6 @@
 // @spec FR-003: Cron expression validation — .specs/features/001-task-manifest/spec.md#fr-003
 
-import { parseExpression } from "cron-parser";
+import { CronExpressionParser } from "cron-parser";
 import { InvalidCronExpressionError } from "./cron.errors";
 
 /**
@@ -14,7 +14,7 @@ export function validateCronExpression(expression: string): void {
 		throw new InvalidCronExpressionError(expression);
 	}
 	try {
-		parseExpression(expression);
+		CronExpressionParser.parse(expression);
 	} catch {
 		throw new InvalidCronExpressionError(expression);
 	}
@@ -29,7 +29,7 @@ export function validateCronExpression(expression: string): void {
  */
 export function getNextExecution(expression: string): Date {
 	try {
-		const interval = parseExpression(expression);
+		const interval = CronExpressionParser.parse(expression);
 		return interval.next().toDate();
 	} catch {
 		throw new InvalidCronExpressionError(expression);

@@ -6,7 +6,7 @@
 |-------------|---------|-------------|--------|---------------|
 | FR-001 | src/app/config.ts, src/task/task.repository.ts | `@spec FR-001` | ✅ Implemented | 2026-03-30 |
 | FR-002 | src/task/task.types.ts, src/task/task.service.ts | `@spec FR-002` | ✅ Implemented | 2026-03-30 |
-| FR-003 | src/cron/cron.service.ts | `@spec FR-003` | ✅ Implemented | 2026-03-30 |
+| FR-003 | src/cron/cron.service.ts | `@spec FR-003` | ✅ Implemented | 2026-08-13 |
 | FR-004 | src/task/task.repository.ts | `@spec FR-004` (in FR-001 anchor) | ✅ Implemented | 2026-03-30 |
 | FR-005 | src/cli/cli.handler.ts | `@spec FR-005` | ✅ Implemented | 2026-03-30 |
 | FR-006 | src/cli/cli.formatter.ts, src/cli/cli.handler.ts | `@spec FR-006` | ✅ Implemented | 2026-03-30 |

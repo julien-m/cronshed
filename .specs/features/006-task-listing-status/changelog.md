@@ -1,5 +1,13 @@
 # Changelog — Task Listing & Status
 
+## 2026-08-13 — Bugfix: cron-parser v5 compatibility
+
+- **Type:** Bugfix
+- **Spec modified:** No
+- **Code modified:** Updated [`src/cron/cron.service.ts`](../../../src/cron/cron.service.ts) to use the cron-parser v5 parser API.
+- **AC impacted:** AC-008 behavior preserved
+- **Author:** Codex CI Guardian
+
 ## 2026-03-30 — [Feature]: Implemented task listing & status enrichment
 
 - **Type:** Feature

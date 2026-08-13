@@ -1,6 +1,6 @@
 // @spec FR-095: Schedule interval calculation — .specs/features/015-wrapper-protections/spec.md#fr-095
 
-import { parseExpression } from "cron-parser";
+import { CronExpressionParser } from "cron-parser";
 
 /** Number of consecutive occurrences to sample for minimum gap calculation. */
 const SAMPLE_COUNT = 10;
@@ -14,7 +14,7 @@ const SAMPLE_COUNT = 10;
  */
 export function scheduleToIntervalSeconds(schedule: string): number | null {
 	try {
-		const interval = parseExpression(schedule);
+		const interval = CronExpressionParser.parse(schedule);
 		const times: number[] = [];
 
 		for (let i = 0; i < SAMPLE_COUNT; i++) {

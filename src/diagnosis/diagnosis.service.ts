@@ -4,7 +4,7 @@ import { constants } from "node:fs";
 import { access, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { parseExpression } from "cron-parser";
+import { CronExpressionParser } from "cron-parser";
 import { isFilePath } from "../cli/command.resolver";
 import type { CrontabAdapter } from "../crontab/crontab.adapter";
 import type { CrontabEntry } from "../crontab/crontab.types";
@@ -103,7 +103,7 @@ export class DiagnosisService {
 			return;
 		}
 		try {
-			parseExpression(task.schedule);
+			CronExpressionParser.parse(task.schedule);
 		} catch {
 			issues.push({
 				check: DIAGNOSIS_CHECKS.CRON_EXPRESSION,

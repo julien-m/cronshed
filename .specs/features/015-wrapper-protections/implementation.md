@@ -25,6 +25,12 @@
 | FR-098 | Lock hash computation | src/wrapper/wrapper.service.ts (computeLockHash) | @spec FR-098 |
 | FR-099 | Safe lock file naming via SHA-256 | src/wrapper/wrapper.service.ts (computeLockHash) | @spec FR-098 |
 
+## Verification
+
+| Requirement | File | Last Verified |
+|-------------|------|---------------|
+| FR-095 | src/cron/schedule-interval.ts | 2026-08-13 |
+
 ## AC Coverage
 
 | AC | Description | Satisfied By |
