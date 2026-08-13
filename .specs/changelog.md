@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-08-13 — Bugfix: TypeScript 6 Bun ambient types
+
+- **Type:** Tooling Bugfix
+- **Spec modified:** No
+- **Configuration modified:** Updated [`tsconfig.json`](../tsconfig.json) to load Bun ambient types explicitly under TypeScript 6.
+- **Behavior impacted:** None; compiler compatibility only
+- **Author:** Codex CI Guardian
+
+---
+
 ## 2026-04-13 — Feature: Wrapper Protections implemented
 
 - **Type:** Feature Implemented
