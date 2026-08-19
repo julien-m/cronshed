@@ -1,5 +1,13 @@
 # Changelog — 015-wrapper-protections
 
+## 2026-08-13 — Bugfix: cron-parser v5 compatibility
+
+- **Type:** Bugfix
+- **Spec modified:** No
+- **Code modified:** Updated [`src/cron/schedule-interval.ts`](../../../src/cron/schedule-interval.ts) to use the cron-parser v5 parser API.
+- **AC impacted:** AC-083 and AC-086 behavior preserved
+- **Author:** Codex CI Guardian
+
 ## 2026-04-13 — Initial Implementation
 
 ### Added

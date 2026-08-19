@@ -12,7 +12,7 @@
 | Requirement | File(s) | @spec Anchor | Status | Last Verified |
 |-------------|---------|-------------|--------|---------------|
 | FR-063 | `src/diagnosis/diagnosis.service.ts` | `@spec FR-063` | ✅ Implemented | 2026-03-30 |
-| FR-064 | `src/diagnosis/diagnosis.service.ts` | `@spec FR-064` | ✅ Implemented | 2026-03-30 |
+| FR-064 | `src/diagnosis/diagnosis.service.ts` | `@spec FR-064` | ✅ Implemented | 2026-08-13 |
 | FR-065 | `src/diagnosis/diagnosis.service.ts` | `@spec FR-065` | ✅ Implemented | 2026-03-30 |
 | FR-066 | `src/diagnosis/diagnosis.service.ts` | `@spec FR-066` | ✅ Implemented | 2026-03-30 |
 | FR-067 | `src/diagnosis/diagnosis.service.ts` | `@spec FR-067` | ✅ Implemented | 2026-03-30 |

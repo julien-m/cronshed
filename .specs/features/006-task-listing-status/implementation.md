@@ -4,7 +4,7 @@
 
 | Requirement | File(s) | @spec Anchor | Status | Last Verified |
 |---|---|---|---|---|
-| FR-001 | src/cron/cron.service.ts | `@spec FR-001` | ✅ Implemented | 2026-03-30 |
+| FR-001 | src/cron/cron.service.ts | `@spec FR-001` | ✅ Implemented | 2026-08-13 |
 | FR-002 | src/log/log.service.ts | `@spec FR-002` | ✅ Implemented | 2026-03-30 |
 | FR-003 | src/log/log.types.ts | `@spec FR-003` | ✅ Implemented | 2026-03-30 |
 | FR-004 | src/cli/cli.formatter.ts | `@spec FR-004` | ✅ Implemented | 2026-03-30 |
