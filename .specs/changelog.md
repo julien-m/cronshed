@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-09-30 — Bugfix: Bun-native Dependabot updates
+
+- **Type:** Tooling Bugfix
+- **Spec modified:** No
+- **Configuration modified:** Changed [`dependabot.yml`](../.github/dependabot.yml) to use Dependabot's Bun ecosystem for the repository's text `bun.lock`.
+- **Stack alignment:** Preserved the Bun-only runtime and package-manager decision in [`stacks/_default.md`](stacks/_default.md).
+- **Behavior impacted:** Dependency update automation only; no Cronshed runtime behavior changes
+- **Author:** Codex CI Guardian
+
+---
+
 ## 2026-08-13 — Bugfix: cron-parser v5 compatibility
 
 - **Type:** Bugfix
