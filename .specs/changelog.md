@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-10-01 — Bugfix: deterministic ANSI formatter tests
+
+- **Type:** Bugfix
+- **Spec modified:** No
+- **Code modified:** Updated [`src/cli/cli.formatter.test.ts`](../src/cli/cli.formatter.test.ts) to control `NO_COLOR` explicitly and verify colored and plain exit-code output.
+- **Features verified:** [006-task-listing-status](features/006-task-listing-status/implementation.md), [007-execution-history](features/007-execution-history/implementation.md)
+- **Author:** Codex CI Guardian
+
+---
+
 ## 2026-08-13 — Bugfix: cron-parser v5 compatibility
 
 - **Type:** Bugfix

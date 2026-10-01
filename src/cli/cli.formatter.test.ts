@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { ExecutionLogEntry } from "../log/log.types";
 import type { EnrichedTask, Task } from "../task/task.types";
 import {
@@ -12,6 +12,20 @@ import {
 	formatTaskTable,
 	formatWarning,
 } from "./cli.formatter";
+
+const originalNoColor = process.env.NO_COLOR;
+
+beforeEach(() => {
+	delete process.env.NO_COLOR;
+});
+
+afterEach(() => {
+	if (originalNoColor === undefined) {
+		delete process.env.NO_COLOR;
+	} else {
+		process.env.NO_COLOR = originalNoColor;
+	}
+});
 
 const sampleTask: Task = {
 	id: "test-uuid-123",
@@ -118,6 +132,13 @@ describe("formatTaskDetails", () => {
 	test("AC-005: successful exit code is shown with ANSI green", () => {
 		const output = formatTaskDetails(sampleEnrichedTask);
 		expect(output).toContain("\x1b[32m0\x1b[0m");
+	});
+
+	test("AC-004/AC-005: NO_COLOR keeps the exit code plain", () => {
+		process.env.NO_COLOR = "1";
+		const output = formatTaskDetails(sampleEnrichedTask);
+		expect(output).toMatch(/Exit code:\s+0/);
+		expect(output).not.toContain("\x1b[");
 	});
 
 	test("shows updatedAt when present", () => {
@@ -262,6 +283,13 @@ describe("formatHistoryTable", () => {
 		const failedEntry: ExecutionLogEntry = { ...sampleHistoryEntry, exitCode: 1 };
 		const output = formatHistoryTable([failedEntry]);
 		expect(output).toContain("\x1b[31m1\x1b[0m");
+	});
+
+	test("AC-003: NO_COLOR keeps history exit codes plain", () => {
+		process.env.NO_COLOR = "1";
+		const output = formatHistoryTable([sampleHistoryEntry]);
+		expect(output).toContain("0");
+		expect(output).not.toContain("\x1b[");
 	});
 
 	test("AC-002: multiple entries displayed correctly", () => {

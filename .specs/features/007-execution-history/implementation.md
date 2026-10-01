@@ -9,7 +9,7 @@
 | FR-001 | `src/log/log.service.ts` | `@spec FR-001: Read execution history` | ✅ Implemented | 2026-03-30 |
 | FR-002 | `src/log/log.types.ts` | `@spec FR-002: ExecutionLogEntry type` | ✅ Implemented | 2026-03-30 |
 | FR-003 | `src/cli/cli.handler.ts` | `@spec FR-003: History handler` | ✅ Implemented | 2026-03-30 |
-| FR-004 | `src/cli/cli.formatter.ts` | `@spec FR-004: History table formatting` | ✅ Implemented | 2026-03-30 |
+| FR-004 | `src/cli/cli.formatter.ts` | `@spec FR-004: History table formatting` | ✅ Implemented | 2026-10-01 |
 | FR-005 | `src/cli/cli.formatter.ts` | `@spec FR-005: Output truncation` | ✅ Implemented | 2026-03-30 |
 | FR-006 | `src/cli/cli.handler.ts` | `@spec FR-006: Command registration` | ✅ Implemented | 2026-03-30 |
 | FR-007 | `src/cli/cli.handler.ts` | `@spec FR-003: History handler` (JSON branch) | ✅ Implemented | 2026-03-30 |
@@ -48,5 +48,5 @@
 | `src/cli/cli.formatter.ts` | Modified | Added `formatHistoryTable()`, `formatDuration()`, `formatExitCode()`, helpers |
 | `src/cli/cli.handler.ts` | Modified | Added `handleHistory()`, registered `history` in routing, updated help |
 | `src/log/log.service.test.ts` | Modified | Added 7 tests for `getExecutionHistory` |
-| `src/cli/cli.formatter.test.ts` | Modified | Added 12 tests for `formatHistoryTable` and `formatDuration` |
+| `src/cli/cli.formatter.test.ts` | Modified | Added formatter coverage, including deterministic ANSI/NO_COLOR history behavior |
 | `src/cli/cli.integration.test.ts` | Modified | Added 11 integration tests for `cronshed history` |
