@@ -1,5 +1,13 @@
 # Changelog — Execution History
 
+## 2026-10-01 — Bugfix: deterministic ANSI formatter tests
+
+- **Type:** Bugfix
+- **Spec modified:** No
+- **Code modified:** Updated [`src/cli/cli.formatter.test.ts`](../../../src/cli/cli.formatter.test.ts) to control `NO_COLOR` explicitly and cover plain history output.
+- **AC impacted:** AC-003
+- **Author:** Codex CI Guardian
+
 ## 2026-03-30 — [Feature]: Execution History implemented
 
 - **Type:** Feature

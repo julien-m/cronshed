@@ -8,13 +8,13 @@
 | FR-002 | src/log/log.service.ts | `@spec FR-002` | ✅ Implemented | 2026-03-30 |
 | FR-003 | src/log/log.types.ts | `@spec FR-003` | ✅ Implemented | 2026-03-30 |
 | FR-004 | src/cli/cli.formatter.ts | `@spec FR-004` | ✅ Implemented | 2026-03-30 |
-| FR-005 | src/cli/cli.formatter.ts | `@spec FR-005` | ✅ Implemented | 2026-03-30 |
+| FR-005 | src/cli/cli.formatter.ts | `@spec FR-005` | ✅ Implemented | 2026-10-01 |
 | FR-006 | src/task/task.types.ts | `@spec FR-006` | ✅ Implemented | 2026-03-30 |
 | FR-007 | src/cli/cli.handler.ts | `@spec FR-007` | ✅ Implemented | 2026-03-30 |
 | FR-008 | src/cli/cli.handler.ts | `@spec FR-008` | ✅ Implemented | 2026-03-30 |
 | FR-009 | src/cli/cli.handler.ts | `@spec FR-007` | ✅ Implemented | 2026-03-30 |
 | FR-010 | src/cli/cli.handler.ts | `@spec FR-008` | ✅ Implemented | 2026-03-30 |
-| FR-011 | src/cli/cli.formatter.ts | `@spec FR-005` | ✅ Implemented | 2026-03-30 |
+| FR-011 | src/cli/cli.formatter.ts | `@spec FR-005` | ✅ Implemented | 2026-10-01 |
 
 ## Acceptance Criteria Mapping
 
@@ -44,5 +44,5 @@
 | src/log/log.service.test.ts | Created | 7 tests for getLastExecution |
 | src/task/task.types.ts | Modified | Added EnrichedTask interface |
 | src/cli/cli.formatter.ts | Modified | Updated formatTaskTable and formatTaskDetails for EnrichedTask, added formatTimestamp |
-| src/cli/cli.formatter.test.ts | Modified | Updated tests for enriched columns and details |
+| src/cli/cli.formatter.test.ts | Modified | Updated tests for enriched columns, details, and deterministic ANSI/NO_COLOR behavior |
 | src/cli/cli.handler.ts | Modified | Added enrichTask/enrichTasks helpers, updated handleList and handleGet |

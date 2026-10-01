@@ -1,5 +1,13 @@
 # Changelog — Task Listing & Status
 
+## 2026-10-01 — Bugfix: deterministic ANSI formatter tests
+
+- **Type:** Bugfix
+- **Spec modified:** No
+- **Code modified:** Updated [`src/cli/cli.formatter.test.ts`](../../../src/cli/cli.formatter.test.ts) to control `NO_COLOR` explicitly and cover plain output.
+- **AC impacted:** AC-004, AC-005
+- **Author:** Codex CI Guardian
+
 ## 2026-08-13 — Bugfix: cron-parser v5 compatibility
 
 - **Type:** Bugfix
