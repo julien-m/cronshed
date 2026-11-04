@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-11-04 — Bugfix: Dependabot Bun ecosystem
+
+- **Type:** Tooling Bugfix
+- **Spec modified:** No
+- **Configuration modified:** Updated [Dependabot configuration](../.github/dependabot.yml) to use the Bun ecosystem for `bun.lock`.
+- **Behavior impacted:** Dependency update tooling only
+- **Author:** Codex CI Guardian
+
+---
+
 ## 2026-08-13 — Bugfix: cron-parser v5 compatibility
 
 - **Type:** Bugfix
